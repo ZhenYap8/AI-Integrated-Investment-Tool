@@ -1,0 +1,108 @@
+/* ==============================
+   App-Level Styles
+   ============================== */
+
+/* Root container spacing */
+#root {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(16px, 2vw, 32px);
+}
+
+/* Generic container for layout consistency */
+.container {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 2vw, 32px);
+}
+
+/* ==============================
+   Card Styles
+   ============================== */
+.card {
+  background: var(--color-bg-light, #ffffff);
+  color: var(--color-text-dark, #1f2937);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 1.5rem;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .card {
+    background: #0f172a; /* slate-900 */
+    color: rgba(255, 255, 255, 0.92);
+    border-color: rgba(255, 255, 255, 0.06);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.45),
+      0 10px 28px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ==============================
+   Text Utilities
+   ============================== */
+
+/* Muted text helper */
+.muted {
+  color: rgba(0, 0, 0, 0.55);
+}
+@media (prefers-color-scheme: dark) {
+  .muted {
+    color: rgba(255, 255, 255, 0.65);
+  }
+}
+
+/* Visually hidden utility (for accessibility) */
+.visually-hidden {
+  position: absolute !important;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  margin: -1px;
+}
+
+/* ==============================
+   Logo Styles
+   ============================== */
+.logo {
+  height: 48px;
+  width: auto;
+  display: inline-block;
+  transition: opacity 160ms ease-in-out, transform 160ms ease-in-out;
+}
+.logo:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ==============================
+   Spacing Utilities
+   ============================== */
+.section {
+  margin-block: clamp(16px, 4vw, 40px);
+}
+
+.section--tight {
+  margin-block: clamp(12px, 3vw, 28px);
+}
+
+/* ==============================
+   Documentation Note Style
+   ============================== */
+.read-the-docs {
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.95rem;
+}
+@media (prefers-color-scheme: dark) {
+  .read-the-docs {
+    color: rgba(255, 255, 255, 0.7);
+  }
+}

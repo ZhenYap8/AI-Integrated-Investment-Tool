@@ -1,0 +1,473 @@
+/* ==============================
+   App layout + theming
+   ============================== */
+
+   :root {
+    --border: #e5e7eb;
+    --muted: #6b7280;
+    --card: #ffffff;
+    --row-hover: #f9fafb;
+    --bg: #ffffff;
+    --text: #111827;
+  }
+  
+  .dark-mode {
+    --border: #1f2937;
+    --muted: #9ca3af;
+    --card: #0f172a;
+    --row-hover: #0b1220;
+    --bg: #0b1220;
+    --text: #e5e7eb;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+  
+  /* Layout wrapper to center main content */
+  .layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  /* ==============================
+     Navbar
+     ============================== */
+  
+  .navbar {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 0;
+  }
+  
+  .navbar-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .brand {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+  }
+  
+  .nav-link {
+    margin-left: 1rem;
+    text-decoration: none;
+    color: #374151;
+    font-weight: 500;
+  }
+  
+  .dark-mode .nav-link {
+    color: #cbd5e1;
+  }
+  
+  .nav-link.active {
+    color: #2563eb;
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 2px;
+  }
+  
+  .toggle-theme {
+    margin-left: 1rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+  }
+  .toggle-theme:hover {
+    filter: brightness(1.02);
+  }
+  
+  /* ==============================
+     Main + Footer
+     ============================== */
+  
+  .main-content {
+    flex: 1;
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+  }
+  
+  .footer {
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    padding: 1rem 0;
+  }
+  
+  .footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+  }
+  
+  /* ==============================
+     Cards / Sections / Badges
+     ============================== */
+  
+  .section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0 0 12px;
+    line-height: 1.3;
+  }
+  
+  .sub { color: var(--muted); font-size: .9rem; }
+  
+  .stack-lg > * + * { margin-top: 24px; }
+  @media (min-width: 1024px) {
+    .stack-lg > * + * { margin-top: 28px; }
+  }
+  
+  .badge {
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: .75rem;
+    border: 1px solid var(--border);
+  }
+  .badge.green { background: #e8f5e9; color: #166534; border-color: #c8e6c9; }
+  .badge.red   { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+  .dark-mode .badge.green { background: #052e16; color: #86efac; border-color: #064e3b; }
+  .dark-mode .badge.red   { background: #7f1d1d; color: #fecaca; border-color: #b91c1c; }
+  
+  /* ==============================
+     KPI block
+     ============================== */
+  
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  .kpi  { border: 1px solid var(--border); border-radius: 14px; padding: 14px; background: var(--card); }
+  .kpi .label { color: var(--muted); font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; }
+  .kpi .value { font-weight: 600; font-size: 1.25rem; margin-top: 6px; }
+  
+  /* ==============================
+     Scorecard + Pills
+     ============================== */
+  
+  .score-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  @media (max-width: 640px) {
+    .score-grid { grid-template-columns: 1fr; }
+  }
+  
+  .score-card { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: var(--card); }
+  .score-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  
+  .pill { border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; font-size: .7rem; font-weight: 600; }
+  .pill.green { background: #dcfce7; color: #166534; }
+  .pill.amber { background: #fef9c3; color: #92400e; }
+  .pill.red   { background: #fee2e2; color: #991b1b; }
+  
+  /* ==============================
+     Operating margin meter
+     ============================== */
+  
+  .meter {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .meter-fill { height: 100%; border-radius: 999px; }
+  .meter-fill.green { background: #22c55e; }  /* green-500 */
+  .meter-fill.amber { background: #f59e0b; }  /* amber-500 */
+  .meter-fill.red   { background: #ef4444; }  /* red-500 */
+  .meter-caption { margin-top: 6px; font-size: .85rem; color: var(--muted); }
+  
+  /* ==============================
+     Tables
+     ============================== */
+  
+  .table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .95rem; }
+  .table th, .table td { padding: 10px 12px; border-top: 1px solid var(--border); }
+  .table thead th { border-top: none; color: var(--muted); font-weight: 600; }
+  .table tr:hover td { background: var(--row-hover); }
+  .table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  
+  /* ==============================
+     Utility
+     ============================== */
+  
+  a { color: #2563eb; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  
+  /* --- Professional search input --- */
+.search-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between icon and input */
+}
+.search {
+  flex: 1; /* Allow input to take up remaining space */
+  height: 44px;
+  padding: 0 40px 0 44px; /* Space for icons */
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  font-size: 0.95rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.search::placeholder { color: var(--muted); }
+.search:focus {
+  outline: none;
+  border-color: #60a5fa;          /* blue-400 */
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+.search-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.clear-btn,
+.loading-spin {
+  position: absolute;
+  top: 0; bottom: 0;
+  display: grid; place-items: center;
+  width: 36px;
+  color: var(--muted);
+}
+.clear-btn{
+  position: absolute;
+  top: 50%; /* Center vertically */
+  right: 8px; /* Adjust spacing from the right edge */
+  transform: translateY(-50%); /* Align to the middle of the input */
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  opacity: 0.75;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.clear-btn:hover {
+  background: var(--row-hover);
+  opacity: 1;
+}
+
+.loading-spin {
+  right: 40px;                    /* spinner before clear button */
+  pointer-events: none;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.loading-spin::after {
+  content: "";
+  width: 16px; height: 16px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Suggestions dropdown */
+.suggest {
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(100% + 8px);
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+  overflow: hidden;
+  z-index: 40;
+}
+.suggest-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.suggest-item:hover,
+.suggest-item[aria-selected="true"] {
+  background: var(--row-hover);
+}
+.suggest-item .label { font-weight: 600; font-size: .92rem; }
+.suggest-item .type { font-size: .75rem; color: var(--muted); }
+
+/* Thresholds grid inside card */
+.thresh-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 10px;
+}
+@media (min-width: 640px) {
+  .thresh-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+}
+
+.field { display: block; }
+.field-label {
+  display: block;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.field-label .muted { color: var(--muted); font-weight: 500; }
+
+.field-input { position: relative; }
+.field-input input {
+  width: 65%;
+  height: 40px;
+  padding: 0 34px 0 12px;  /* room for adornment */
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: inherit;
+  font-size: .95rem;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.field-input input:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+.adorn {
+  position: absolute;
+  right: 10px;
+  top: 0; bottom: 0;
+  display: grid; place-items: center;
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.thresh-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Hide number input spinners so they don't collide with the unit adornment */
+.field-input input[type="number"]::-webkit-outer-spin-button,
+.field-input input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field-input input[type="number"] {
+  -moz-appearance: textfield;   /* Firefox */
+  appearance: textfield;        /* Safari/Chromium */
+  padding-right: 48px;          /* extra room for the % / x badge */
+}
+
+/* (optional) nudge the unit a touch further right if you want more space */
+.adorn { right: 12px; }
+
+/* Add spacing to buttons */
+button {
+  margin: 8px 0; /* Add vertical spacing */
+}
+
+.controls button,
+.thresh-actions button {
+  margin-top: 12px; /* Add spacing between buttons */
+}
+
+/* Align slider, text, and numbers */
+.flex {
+  display: flex;
+  align-items: center;
+}
+
+.align-middle {
+  vertical-align: middle;
+}
+
+/* Search bar alignment */
+.search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between icon, input, and buttons */
+  position: relative;
+}
+
+.search {
+  flex: 1; /* Allow input to take up remaining space */
+  height: 44px;
+  padding: 0 40px 0 44px; /* Space for icons */
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  font-size: 0.95rem;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.search-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+
+.clear-btn {
+  position: absolute;
+  top: 50%; /* Center vertically */
+  right: 8px; /* Adjust spacing from the right edge */
+  transform: translateY(-50%); /* Align to the middle of the input */
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  opacity: 0.75;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.clear-btn:hover {
+  background: var(--row-hover);
+  opacity: 1;
+}
+
+.loading-spin {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

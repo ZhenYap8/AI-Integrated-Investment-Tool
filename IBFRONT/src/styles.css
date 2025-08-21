@@ -471,3 +471,33 @@ button {
   align-items: center;
   justify-content: center;
 }
+
+/* range buttons */
+.btn-range{
+  border:1px solid var(--border);
+  background:var(--card);
+  color:var(--text);
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:.85rem;
+  cursor:pointer;
+}
+.btn-range:hover{ filter:brightness(1.03); }
+.btn-range.active{
+  border-color:#60a5fa;
+  box-shadow:0 0 0 3px rgba(59,130,246,.15);
+}
+
+/* chart */
+.chart-wrap{ position:relative; }
+.chart-line{ color:#94a3b8; }            /* slate-400 baseline color */
+.chart-line.up{ color:#22c55e; }          /* green when up */
+.chart-line.down{ color:#ef4444; }        /* red when down */
+.chart-baseline{ stroke:var(--border); stroke-dasharray:4 4; }
+.chart-meta{
+  display:flex; gap:8px; align-items:center;
+  margin-top:6px; font-variant-numeric: tabular-nums;
+}
+.chart-pct.up{ color:#16a34a; }
+.chart-pct.down{ color:#dc2626; }
+.chart-empty{ padding:12px; border:1px dashed var(--border); border-radius:8px; }

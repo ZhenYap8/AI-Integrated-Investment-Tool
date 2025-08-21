@@ -22,6 +22,8 @@ export default function App() {
   );
 }
 
+
+
 function SiteChrome({ children }) {
   const [dark, setDark] = useDarkMode();
   const location = useLocation();
@@ -188,6 +190,7 @@ function InvestmentAgentUI({ initialQuery = "" }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+  const [chartData, setChartData] = useState([]); // New state for chart data
   const abortRef = useRef(null);
 
   const [thresh, setThresh] = useState({
@@ -197,6 +200,43 @@ function InvestmentAgentUI({ initialQuery = "" }) {
     interest_cover_min: 4.0,
     roe_min: 0.10,
   });
+
+
+// price chart state (default 1y)
+const [chartRange, setChartRange] = useState('1y');
+
+// helper: pick a price series from backend payload (support a few keys)
+const getSeries = (d) =>
+  d?.prices || d?.priceSeries || d?.meta?.prices || []; // array of { date, close } (date: ISO or epoch)
+
+function sliceByRange(series, range) {
+  if (!Array.isArray(series) || series.length === 0) return [];
+  const norm = series
+    .map(p => {
+      const t = typeof p.date === 'number' ? new Date(p.date * (p.date < 2e10 ? 1000 : 1)) : new Date(p.date);
+      const y = Number(p.close ?? p.price ?? p.y);
+      return (isFinite(t) && isFinite(y)) ? { t, y } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.t - b.t);
+
+  const end = norm[norm.length - 1]?.t ?? new Date();
+  const start = new Date(end);
+  const ytd = new Date(end.getFullYear(), 0, 1);
+
+  switch (range) {
+    case '5d':   start.setDate(end.getDate() - 5); break;
+    case '1m':   start.setMonth(end.getMonth() - 1); break;
+    case '6m':   start.setMonth(end.getMonth() - 6); break;
+    case 'YTD':  return norm.filter(p => p.t >= ytd);
+    case '1y':   start.setFullYear(end.getFullYear() - 1); break;
+    case '5y':   start.setFullYear(end.getFullYear() - 5); break;
+    case '10y':  start.setFullYear(end.getFullYear() - 10); break;
+    default:     start.setFullYear(end.getFullYear() - 1);
+  }
+  return norm.filter(p => p.t >= start);
+}
+
 
   useEffect(() => {
     const saved = localStorage.getItem("agent-thresholds");
@@ -230,7 +270,7 @@ function InvestmentAgentUI({ initialQuery = "" }) {
     setShowSuggest(false);
     setLoading(true);
     setError("");
-  
+
     const params = new URLSearchParams({
       query: q,
       years: String(years),
@@ -240,10 +280,15 @@ function InvestmentAgentUI({ initialQuery = "" }) {
       interest_cover_min: String(thresh.interest_cover_min),
       roe_min: String(thresh.roe_min),
     });
-  
+
     fetch(api(`/api/analyze?${params.toString()}`))
       .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t || "Analyze failed"))))
-      .then(json => setData(json))
+      .then(json => {
+      console.log("Prices from backend:", json.prices); // Debugging statement
+      setData(json);
+      const series = sliceByRange(getSeries(json), chartRange); // Extract and filter price data
+      setChartData(series); // Update chart data
+    })
       .catch(e => setError(e.message || "Something went wrong"))
       .finally(() => setLoading(false));
   };
@@ -325,6 +370,25 @@ function InvestmentAgentUI({ initialQuery = "" }) {
             {/* LEFT: Overview + Scorecard + Valuation */}
             <section className="lg:col-span-2 stack-lg">
               <Card>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:12 }}>
+                  {['5d','1m','6m','YTD','1y','5y','10y'].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setChartRange(r)}
+                      className={`btn-range ${chartRange === r ? 'active' : ''}`}
+                      type="button"
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+
+                <PriceChart
+                  series={chartData} // Use the updated chart data
+                  height={220}
+                />
+              </Card>
+              <Card>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div>
                     <h2 className="section-title">Overview</h2>
@@ -401,7 +465,7 @@ function InvestmentAgentUI({ initialQuery = "" }) {
                 <div style={{ height: 12 }} />
                 <Bullets title="Key Risks" items={data?.risks} tone="red" />
               </Card>
-<Card>
+              <Card>
                 <h2 className="section-title" style={{ marginBottom: 8 }}>Filters</h2>
 
                 {/* Years slider in flex box */}
@@ -587,6 +651,47 @@ function NumField({ label, suffix, value, placeholder, onChange, onBlur, hint })
   );
 }
 
+function PriceChart({ series = [], width = '100%', height = 200 }) {
+  if (!series || series.length < 2) {
+    return <div className="chart-empty sub">Price chart unavailable.</div>;
+  }
+
+  const xs = series.map(p => p.t.getTime());
+  const ys = series.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const padY = (maxY - minY) * 0.08 || 1;
+
+  const W = 800;
+  const H = typeof height === 'number' ? height : 200;
+  const toX = t => ((t - minX) / (maxX - minX || 1)) * (W - 20) + 10;
+  const toY = y => {
+    const a = (y - (minY - padY)) / ((maxY + padY) - (minY - padY) || 1);
+    return (1 - a) * (H - 20) + 10;
+  };
+
+  let d = `M ${toX(xs[0])} ${toY(ys[0])}`;
+  for (let i = 1; i < series.length; i++) {
+    d += ` L ${toX(xs[i])} ${toY(ys[i])}`;
+  }
+
+  const last = series[series.length - 1].y;
+  const first = series[0].y;
+  const pct = ((last - first) / first) * 100;
+
+  return (
+    <div className="chart-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width, height }}>
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="2" className={pct >= 0 ? 'chart-line up' : 'chart-line down'} />
+        <line x1="10" x2={W-10} y1={toY(first)} y2={toY(first)} className="chart-baseline" />
+      </svg>
+      <div className="chart-meta">
+        <span className="sub">Change</span>
+        <span className={`chart-pct ${pct >= 0 ? 'up' : 'down'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</span>
+      </div>
+    </div>
+  );
+}
 
 function KPI({ label, value }) {
   return (

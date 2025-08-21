@@ -1,10 +1,7 @@
-fastapi
-uvicorn
-yfinance
-pandas
-numpy
-requests
-python-dotenv
-beautifulsoup4
-lxml
+black
+ruff
+pytest
+pytest-asyncio
 httpx
+
+

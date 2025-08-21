@@ -1,4 +1,4 @@
-# Investment Agent Backend Scaffold (FastAPI)
+# Investment Agent Backend Scaffold (FastAPI) - Archived Version
 # -------------------------------------------------------------
 # Endpoints:
 #   GET /api/suggest?q=... -> autocomplete for companies/industries

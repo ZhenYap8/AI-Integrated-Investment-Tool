@@ -137,6 +137,7 @@ class AnalyzeResponse(BaseModel):
     cons: List[BulletItem] = Field(default_factory=list)
     risks: List[BulletItem] = Field(default_factory=list)
     sources: List[SourceItem] = Field(default_factory=list)
+    prices: List[Dict[str, Any]] = Field(default_factory=list)  # Add this line
 
 # -------------------- Helpers -------------------- #
 
@@ -426,6 +427,13 @@ def analyze_company(ticker: str, years: int, thresh: Dict[str, float]) -> Analyz
         y_url = f"https://finance.yahoo.com/quote/{ticker}"
         sources = [SourceItem(title=f"Yahoo Finance – {ticker}", url=y_url)]
 
+        prices = [
+            {"date": d.isoformat(), "close": float(c)}
+            for d, c in zip(hist.index, hist["Close"])
+            if not math.isnan(c)
+        ]
+        print("Prices:", prices)  # Debugging statement
+
         return AnalyzeResponse(
             meta={"queryType": "company", "ticker": ticker, "asOf": dt.date.today().isoformat()},
             scorecard=scorecard,
@@ -434,6 +442,7 @@ def analyze_company(ticker: str, years: int, thresh: Dict[str, float]) -> Analyz
             cons=cons,
             risks=risks,
             sources=sources,
+            prices=prices,  # Ensure this is included
         )
 
     except HTTPException:

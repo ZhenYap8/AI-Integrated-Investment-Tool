@@ -5,27 +5,19 @@ It is built with a FastAPI backend and integrates scraping, data analysis, and A
 
 🚀 Features
 
-Company Scraper – Extracts data on listed companies from stock market sources.
-
-AI Insights – Provides AI-generated commentary and recommendations on company performance.
-
-Growth & Market Share Analysis – Tools for evaluating market opportunities (e.g. BCG growth-share matrix).
-
-API Access – FastAPI backend for clean endpoints and integration into other applications.
-
-Investment Reports – Automated generation of structured investment reports.
+- Company Scraper – Extracts data on listed companies from stock market sources.
+- AI Insights – Provides AI-generated commentary and recommendations on company performance.
+- Growth & Market Share Analysis – Tools for evaluating market opportunities (e.g. BCG growth-share matrix).
+- API Access – FastAPI backend for clean endpoints and integration into other applications.
+- Investment Reports – Automated generation of structured investment reports.
 
 🛠️ Tech Stack
 
-Backend: FastAPI (Python)
-
-Scraping: Selenium / BeautifulSoup / requests (depending on target sources)
-
-AI Analysis: OpenAI API (LLM-based insights)
-
-Data Handling: Pandas, NumPy
-
-Deployment: Docker / Cloud (optional)
+- Backend: FastAPI (Python)
+- Scraping: Selenium / BeautifulSoup / requests (depending on target sources)
+- AI Analysis: OpenAI API (LLM-based insights)
+- Data Handling: Pandas, NumPy
+- Deployment: Docker / Cloud (optional)
 
 🔧 Installation & Setup
 
@@ -57,11 +49,9 @@ http://127.0.0.1:8000/docs
 
 📊 Example Workflow
 
-Use the scraper to fetch company data.
-
-Query the AI analysis endpoint to generate insights.
-
-Export an investment report with AI commentary + financial indicators.
+- Use the scraper to fetch company data.
+- Query the AI analysis endpoint to generate insights.
+- Export an investment report with AI commentary + financial indicators.
 
 📬 Roadmap
 

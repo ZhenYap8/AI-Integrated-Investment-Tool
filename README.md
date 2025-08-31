@@ -27,15 +27,6 @@ Data Handling: Pandas, NumPy
 
 Deployment: Docker / Cloud (optional)
 
-📂 Repository Structure
-.
-├── discovery.py          # FastAPI routes for company discovery & AI insights
-├── investment_reports.py # Investment report generation
-├── scrapers/             # Company scraping scripts
-├── utils/                # Helper functions
-├── requirements.txt      # Dependencies
-└── README.md             # Documentation
-
 🔧 Installation & Setup
 
 Clone the repo:

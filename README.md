@@ -1,4 +1,4 @@
-AI Investment Analysis Tool 📈🤖
+AI Integrated Investment Tool 📈🤖
 
 This repository contains an AI-powered investment analysis platform that scrapes stock market company data and generates actionable insights.
 It is built with a FastAPI backend and integrates scraping, data analysis, and AI models to support smarter investment research.

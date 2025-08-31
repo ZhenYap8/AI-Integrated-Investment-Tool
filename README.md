@@ -38,9 +38,10 @@ cd ai-investment-tool
 Create a virtual environment & install dependencies:
 
 python -m venv venv
+
 source venv/bin/activate   # (Linux/Mac)
 
-venv\Scripts\activate      # (Windows)
+source venv\Scripts\activate      # (Windows)
 
 pip install -r requirements.txt
 

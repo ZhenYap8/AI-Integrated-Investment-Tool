@@ -65,20 +65,14 @@ Export an investment report with AI commentary + financial indicators.
 
 📬 Roadmap
 
- Add sentiment analysis from financial news
-
- Expand scraping to multiple exchanges
-
- Implement portfolio risk analysis
-
- Deploy as a web app with dashboard
+ - Add sentiment analysis from financial news
+ - Expand scraping to multiple exchanges
+ - Implement portfolio risk analysis
+ - Deploy as a web app with dashboard
 
 ⚖️ License & Credit
 
-This project is copyright © Zhen.
-
-The source code is made public for reference and learning purposes only.
-
-Modification, redistribution, or commercial use is not permitted without explicit permission.
-
-If you use part of this project for research or reference, please credit this repository.
+- This project is copyright © Zhen.
+- The source code is made public for reference and learning purposes only.
+- Modification, redistribution, or commercial use is not permitted without explicit permission.
+- If you use part of this project for research or reference, please credit this repository.

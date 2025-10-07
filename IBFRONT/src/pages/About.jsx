@@ -7,7 +7,7 @@ export default function About() {
     <div className="stack-lg">
       <Card>
         <h1 className="title">About</h1>
-        <p className="lead">Sudut Invest is a lightweight tool to explore companies and industries using fundamentals, scorecards, and simple valuation heuristics.</p>
+        <p className="lead">Sudut Invest is a lightweight analytics platform that helps users explore companies and industries through fundamental data, financial scorecards, and simple valuation models. It’s designed to make financial insights accessible, fast, and intuitive.</p>
       </Card>
       <Card>
         <h3 className="section-title">Tech stack</h3>

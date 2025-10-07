@@ -82,7 +82,7 @@ export default function SiteChrome({ children }) {
 
         <footer className="footer">
           <div className="footer-content">
-            <span style={{ fontSize: '3px', fontWeight: 600 }}>© {new Date().getFullYear()} Sudut Invest</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>© {new Date().getFullYear()} Sudut Invest</span>
             <div className="footer-links">
               <Link to="/disclaimer">Not investment advice</Link>
               <a href="#sources">Sources</a>

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Link, NavLink, useLocation } from "react-router-dom";
+import SearchBar from "../IBFRONT/src/components/SearchBar";
 import "./styles.css"; // Import the new CSS file
 
-const API_BASE = (import.meta?.env?.VITE_API_URL || "").replace(/\/$/, "");
+const API_BASE = "http://localhost:8000";
 const api = (path) => `${API_BASE}${path}`;
 
 export default function App() {
@@ -40,7 +41,7 @@ function SiteChrome({ children }) {
             </div>
             <div className="navbar-right">
               <Nav to="/analyze">Analyze</Nav>
-              <Nav to="/docs">Docs</Nav>
+       Analyze<Nav to="/docs">Docs</Nav>
               <Nav to="/about">About</Nav>
               <Nav to="/disclaimer">Disclaimer</Nav>
               <button onClick={() => setDark(!dark)} className="toggle-theme">
@@ -149,7 +150,7 @@ function Docs() {
       <h1>Docs</h1>
       <h3>Endpoints</h3>
       <pre><code>GET /api/suggest?q=...
-GET /api/analyze?query=...&years=1..10</code></pre>
+GET /api/analyze?query=...&years=1|3|5|10</code></pre>
       <h3>Env</h3>
       <pre><code>VITE_API_URL=http://127.0.0.1:8000</code></pre>
       <h3>Notes</h3>
@@ -184,7 +185,8 @@ function NotFound() {
 // ---------------- Analyzer (was InvestmentAgentUI) ---------------- //
 function InvestmentAgentUI({ initialQuery = "" }) {
   const [query, setQuery] = useState(initialQuery || "");
-  const [years, setYears] = useState(10);
+  // Historical data range for backend metrics window
+  const [histRange, setHistRange] = useState('5Y'); // 1Y | 3Y | 5Y | 10Y
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggest, setShowSuggest] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -201,42 +203,91 @@ function InvestmentAgentUI({ initialQuery = "" }) {
     roe_min: 0.10,
   });
 
+  // price chart state (default ALL)
+  const [chartRange, setChartRange] = useState('ALL');
 
-// price chart state (default 1y)
-const [chartRange, setChartRange] = useState('1y');
+  const YEARS_MAP = { '1Y': 1, '3Y': 3, '5Y': 5, '10Y': 10 };
+  const VALID_RANGES = ['1Y','3Y','5Y','10Y'];
 
-// helper: pick a price series from backend payload (support a few keys)
-const getSeries = (d) =>
-  d?.prices || d?.priceSeries || d?.meta?.prices || []; // array of { date, close } (date: ISO or epoch)
+  // Initialize histRange from URL (?range= or ?years=) or localStorage
+  useEffect(() => {
+    try {
+      const usp = new URLSearchParams(window.location.search);
+      let init = null;
+      const r = (usp.get('range') || '').toUpperCase();
+      if (VALID_RANGES.includes(r)) init = r;
+      if (!init) {
+        const yrs = parseInt(usp.get('years') || '', 10);
+        if (!isNaN(yrs)) {
+          if (yrs <= 1) init = '1Y'; else if (yrs <= 3) init = '3Y'; else if (yrs <= 6) init = '5Y'; else init = '10Y';
+        }
+      }
+      if (!init) {
+        const saved = localStorage.getItem('agent-histRange');
+        if (saved && VALID_RANGES.includes(saved)) init = saved;
+      }
+      if (init && init !== histRange) setHistRange(init);
+    } catch {}
+  }, []);
 
-function sliceByRange(series, range) {
-  if (!Array.isArray(series) || series.length === 0) return [];
-  const norm = series
-    .map(p => {
-      const t = typeof p.date === 'number' ? new Date(p.date * (p.date < 2e10 ? 1000 : 1)) : new Date(p.date);
-      const y = Number(p.close ?? p.price ?? p.y);
-      return (isFinite(t) && isFinite(y)) ? { t, y } : null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.t - b.t);
+  // Persist histRange to URL and localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('agent-histRange', histRange);
+      const usp = new URLSearchParams(window.location.search);
+      usp.set('range', histRange);
+      usp.set('years', String(YEARS_MAP[histRange]));
+      const newUrl = `${window.location.pathname}?${usp.toString()}${window.location.hash}`;
+      window.history.replaceState({}, '', newUrl);
+    } catch {}
+  }, [histRange]);
 
-  const end = norm[norm.length - 1]?.t ?? new Date();
-  const start = new Date(end);
-  const ytd = new Date(end.getFullYear(), 0, 1);
+  // helper: pick a price series from backend payload (support a few keys)
+  const getSeries = (d) =>
+    (d?.prices || d?.priceSeries || d?.meta?.prices || []).map(p => ({
+      date: p.date,
+      roe: p.roe,
+      y: p.roe ?? p.y ?? p.close ?? p.price,
+    }));
 
-  switch (range) {
-    case '5d':   start.setDate(end.getDate() - 5); break;
-    case '1m':   start.setMonth(end.getMonth() - 1); break;
-    case '6m':   start.setMonth(end.getMonth() - 6); break;
-    case 'YTD':  return norm.filter(p => p.t >= ytd);
-    case '1y':   start.setFullYear(end.getFullYear() - 1); break;
-    case '5y':   start.setFullYear(end.getFullYear() - 5); break;
-    case '10y':  start.setFullYear(end.getFullYear() - 10); break;
-    default:     start.setFullYear(end.getFullYear() - 1);
+  function sliceByRange(series, range) {
+    if (!Array.isArray(series) || series.length === 0) return [];
+    const norm = series
+      .map(p => {
+        const t = typeof p.date === 'number' ? new Date(p.date * (p.date < 2e10 ? 1000 : 1)) : new Date(p.date);
+        const y = Number(p.close ?? p.price ?? p.y);
+        return (isFinite(t) && isFinite(y)) ? { t, y } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.t - b.t);
+
+    if (range === 'ALL') return norm;
+
+    const end = norm[norm.length - 1]?.t ?? new Date();
+    const start = new Date(end);
+    const ytd = new Date(end.getFullYear(), 0, 1);
+
+    switch (range) {
+      case '5d':   start.setDate(end.getDate() - 5); break;
+      case '1m':   start.setMonth(end.getMonth() - 1); break;
+      case '6m':   start.setMonth(end.getMonth() - 6); break;
+      case 'YTD':  return norm.filter(p => p.t >= ytd);
+      case '1y':   start.setFullYear(end.getFullYear() - 1); break;
+      case '5y':   start.setFullYear(end.getFullYear() - 5); break;
+      case '10y':  start.setFullYear(end.getFullYear() - 10); break;
+      default:     start.setFullYear(end.getFullYear() - 1);
+    }
+    const sliced = norm.filter(p => p.t >= start);
+    // ROE is annual and sparse; if too few points after slicing, fall back to full series
+    return sliced.length >= 2 ? sliced : norm;
   }
-  return norm.filter(p => p.t >= start);
-}
 
+  // Recompute chart data when data or range changes
+  useEffect(() => {
+    if (!data) return;
+    const series = sliceByRange(getSeries(data), chartRange);
+    setChartData(series);
+  }, [data, chartRange]);
 
   useEffect(() => {
     const saved = localStorage.getItem("agent-thresholds");
@@ -250,49 +301,58 @@ function sliceByRange(series, range) {
   useEffect(() => { if (initialQuery) runAnalyze(initialQuery); }, [initialQuery]);
 
   useEffect(() => {
-    const id = setTimeout(() => {
-      const q = query.trim();
-      if (!q) { setSuggestions([]); return; }
-      if (abortRef.current) abortRef.current.abort();
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
-      fetch(api(`/api/suggest?q=${encodeURIComponent(q)}`), { signal: ctrl.signal })
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(json => setSuggestions(Array.isArray(json) ? json.slice(0, 8) : []))
-        .catch(() => setSuggestions([]));
-    }, 180);
-    return () => clearTimeout(id);
+    if (!query.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      console.log('Fetching suggestions for:', query);
+      fetch(api(`/api/suggest?q=${encodeURIComponent(query)}`))
+        .then(r => {
+          console.log('Suggest response:', r.status);
+          return r.ok ? r.json() : [];
+        })
+        .then(data => {
+          console.log('Suggest data:', data);
+          setSuggestions(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          console.error('Suggest error:', err);
+          setSuggestions([]);
+        });
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
-  const runAnalyze = (value) => {
-    const q = (typeof value === 'string' && value) ? value : query;
-    if (!q) return;
-    setShowSuggest(false);
+  const runAnalyze = (searchQuery) => {
+    const q = searchQuery || query;
+    if (!q.trim()) return;
+
     setLoading(true);
     setError("");
+    setShowSuggest(false);
 
-    const params = new URLSearchParams({
-      query: q,
-      years: String(years),
-      rev_cagr_min: String(thresh.rev_cagr_min),
-      op_margin_min: String(thresh.op_margin_min),
-      nd_eq_max: String(thresh.nd_eq_max),
-      interest_cover_min: String(thresh.interest_cover_min),
-      roe_min: String(thresh.roe_min),
-    });
-
-    fetch(api(`/api/analyze?${params.toString()}`))
-      .then(r => r.ok ? r.json() : r.text().then(t => Promise.reject(new Error(t || "Analyze failed"))))
-      .then(json => {
-      console.log("Prices from backend:", json.prices); // Debugging statement
-      setData(json);
-      const series = sliceByRange(getSeries(json), chartRange); // Extract and filter price data
-      setChartData(series); // Update chart data
-    })
-      .catch(e => setError(e.message || "Something went wrong"))
-      .finally(() => setLoading(false));
+    console.log('Analyzing:', q);
+    fetch(api(`/api/analyze?query=${encodeURIComponent(q)}`))
+      .then(r => {
+        console.log('Analyze response:', r.status);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        console.log('Analyze data:', data);
+        setData(data);
+      })
+      .catch(err => {
+        console.error('Analyze error:', err);
+        setError(err.message || "Analysis failed");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
-  
 
   const onKeyDown = (e) => { if (e.key === 'Enter') runAnalyze(); };
 
@@ -300,7 +360,7 @@ function sliceByRange(series, range) {
     <div>
       <header className="rounded-2xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-6">
         <h1 className="text-2xl font-semibold tracking-tight">Analyze</h1>
-        <p className="text-slate-600 dark:text-slate-400">Search a company or industry, set the years window, then analyze.</p>
+        <p className="text-slate-600 dark:text-slate-400">Search a company or industry, pick a historical data range, then analyze.</p>
 
         <div className="controls">
           <SearchBar
@@ -319,19 +379,18 @@ function sliceByRange(series, range) {
           />
 
           <div className="flex items-center gap-3 rounded-xl border bg-white dark:bg-slate-900 dark:border-slate-800 p-3">
-            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Years</label>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              step={1}
-              value={years}
-              onChange={(e) => setYears(parseInt(e.target.value, 10))}
-              onMouseUp={() => runAnalyze()}
-              onTouchEnd={() => runAnalyze()}
-              className="w-40 align-middle"
-            />
-            <span className="text-sm tabular-nums">{years}</span>
+            <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Historical data range</label>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }} role="group" aria-label="Historical data range">
+              {['1Y','3Y','5Y','10Y'].map(r => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`btn-range ${histRange === r ? 'active' : ''}`}
+                  aria-pressed={histRange === r}
+                  onClick={() => { setHistRange(r); runAnalyze(); }}
+                >{r}</button>
+              ))}
+            </div>
           </div>
 
           <button
@@ -371,7 +430,7 @@ function sliceByRange(series, range) {
             <section className="lg:col-span-2 stack-lg">
               <Card>
                 <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:12 }}>
-                  {['5d','1m','6m','YTD','1y','5y','10y'].map(r => (
+                  {['ALL','5d','1m','6m','YTD','1y','5y','10y'].map(r => (
                     <button
                       key={r}
                       onClick={() => setChartRange(r)}
@@ -459,30 +518,39 @@ function sliceByRange(series, range) {
             <aside className="stack-lg">
               <Card>
                 <h2 className="section-title" style={{ marginBottom: 8 }}>AI Analysis</h2>
-                <Bullets title="Pros" items={data?.pros} tone="green" />
-                <div style={{ height: 12 }} />
-                <Bullets title="Cons" items={data?.cons} tone="amber" />
-                <div style={{ height: 12 }} />
-                <Bullets title="Key Risks" items={data?.risks} tone="red" />
+                {
+                  // Only show AI-generated findings; do not fall back to legacy pros/cons
+                }
+                <Bullets
+                  title="Pros"
+                  items={(data?.findings || []).filter(f => f?.direction === 'pro').map(f => f?.item)}
+                  tone="green"
+                />
+                <div style={{ height: 10 }} />
+                <Bullets
+                  title="Cons"
+                  items={(data?.findings || []).filter(f => f?.direction === 'con').map(f => f?.item)}
+                  tone="red"
+                />
+                {/* Removed Key Risks to show only AI output */}
               </Card>
               <Card>
                 <h2 className="section-title" style={{ marginBottom: 8 }}>Filters</h2>
 
-                {/* Years slider in flex box */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px' }}>
-                  <span className="sub">Years</span>
-                  <input
-                    type="range"
-                    min={1}
-                    max={10}
-                    step={1}
-                    value={years}
-                    onChange={(e) => setYears(parseInt(e.target.value, 10))}
-                    onMouseUp={() => runAnalyze()}
-                    onTouchEnd={() => runAnalyze()}
-                    style={{ flex: 1 }}
-                  />
-                  <span>{years} year{years > 1 ? 's' : ''}</span>
+                {/* Historical data range */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '12px', flexWrap: 'wrap' }}>
+                  <span className="sub">Historical data range</span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} role="group" aria-label="Historical data range">
+                    {['1Y','3Y','5Y','10Y'].map(r => (
+                      <button
+                        key={r}
+                        type="button"
+                        className={`btn-range ${histRange === r ? 'active' : ''}`}
+                        aria-pressed={histRange === r}
+                        onClick={() => { setHistRange(r); runAnalyze(); }}
+                      >{r}</button>
+                    ))}
+                  </div>
                 </div>
 
 
@@ -653,7 +721,7 @@ function NumField({ label, suffix, value, placeholder, onChange, onBlur, hint })
 
 function PriceChart({ series = [], width = '100%', height = 200 }) {
   if (!series || series.length < 2) {
-    return <div className="chart-empty sub">Price chart unavailable.</div>;
+    return <div className="chart-empty sub">ROE chart unavailable.</div>;
   }
 
   const xs = series.map(p => p.t.getTime());
@@ -686,7 +754,7 @@ function PriceChart({ series = [], width = '100%', height = 200 }) {
         <line x1="10" x2={W-10} y1={toY(first)} y2={toY(first)} className="chart-baseline" />
       </svg>
       <div className="chart-meta">
-        <span className="sub">Change</span>
+        <span className="sub">ROE change</span>
         <span className={`chart-pct ${pct >= 0 ? 'up' : 'down'}`}>{pct >= 0 ? '+' : ''}{pct.toFixed(2)}%</span>
       </div>
     </div>
@@ -716,20 +784,30 @@ function ScoreItem({ label, verdict, detail /* value, threshold, unit unused */ 
   );
 }
 
-function Bullets({ title, items = [], tone = 'gray' }) {
-  const toneMap = { green: 'border-green-200', amber: 'border-yellow-200', red: 'border-red-200', gray: 'border-slate-200' };
+function Bullets({ title, items = [], tone = "green" }) {
+  const toneClass = tone === "green" ? "text-green-700 dark:text-green-400" : 
+                   tone === "amber" ? "text-amber-700 dark:text-amber-400" : 
+                   "text-red-700 dark:text-red-400";
+  const bgClass = tone === "green" ? "bg-green-50 dark:bg-green-950/30" : 
+                  tone === "amber" ? "bg-amber-50 dark:bg-amber-950/30" : 
+                  "bg-red-50 dark:bg-red-950/30";
+
   return (
     <div>
-      <h4 className="font-semibold mb-2">{title}</h4>
-      {(!items || items.length === 0) && <p className="text-sm text-slate-500 dark:text-slate-400">No items available.</p>}
-      <ul className="space-y-2">
-        {items.map((it, i) => (
-          <li key={i} className={`rounded-xl border ${toneMap[tone]} p-3 bg-slate-50 dark:bg-slate-800/40`}>
-            <div className="text-sm">{it.text}</div>
-            {it.source && (<a className="text-xs text-blue-700 hover:underline" href={it.source} target="_blank" rel="noreferrer">Source</a>)}
-          </li>
-        ))}
-      </ul>
+      <h3 className={`text-sm font-semibold ${toneClass} mb-2`}>{title}</h3>
+      {!items || items.length === 0 ? (
+        <div className={`${bgClass} rounded-lg p-3 text-sm text-slate-600 dark:text-slate-400 italic`}>
+          No items identified for this analysis period.
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((it, i) => (
+            <li key={i} className={`${bgClass} rounded-lg p-3 text-sm leading-relaxed`}>
+              <span className="font-medium">{it}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -754,7 +832,7 @@ function EmptyState({ onDemo }) {
         <div className="text-3xl">🔎</div>
         <div>
           <h3 className="text-lg font-semibold">Search to begin</h3>
-          <p className="text-sm mt-1">Enter a company (e.g., <span className="font-medium">NVDA</span>) or an industry (e.g., <span className="font-medium">Robotics</span>), set the years slider, and click Analyze.</p>
+          <p className="text-sm mt-1">Enter a company (e.g., <span className="font-medium">NVDA</span>) or an industry (e.g., <span className="font-medium">Robotics</span>), choose a historical range (1Y/3Y/5Y/10Y), and click Analyze.</p>
           <button onClick={onDemo} className="mt-4 rounded-lg border px-3 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">Run NVDA demo</button>
         </div>
       </div>
@@ -770,102 +848,5 @@ function fmtCurrency(v) {
   if (v == null || isNaN(v)) return '—';
   try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(v); }
   catch { return `$${Number(v).toFixed(2)}`; }
-}
-
-function SearchBar({
-  value,
-  onChange,
-  onSubmit,
-  suggestions = [],
-  showSuggest,
-  setShowSuggest,
-  loading,
-  onPickSuggestion
-}) {
-  const [active, setActive] = useState(0);
-  const listRef = useRef(null);
-
-  // keyboard nav
-  const onKeyDown = (e) => {
-    if (!showSuggest || suggestions.length === 0) {
-      if (e.key === "Enter") onSubmit();
-      return;
-    }
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setActive((i) => (i + 1) % suggestions.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((i) => (i - 1 + suggestions.length) % suggestions.length);
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      const s = suggestions[active];
-      if (s) onPickSuggestion(s);
-    } else if (e.key === "Escape") {
-      setShowSuggest(false);
-    }
-  };
-
-  return (
-    <div className="search-wrap flex items-center">
-      <span className="search-icon" aria-hidden>
-        {/* magnifier */}
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
-          <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-      </span>
-
-      <input
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setShowSuggest(true);
-        }}
-        onFocus={() => setShowSuggest(true)}
-        onKeyDown={onKeyDown}
-        placeholder="Search company or industry (e.g., NVDA, ABB, Robotics)…"
-        className="search flex-1"
-        aria-autocomplete="list"
-        aria-expanded={showSuggest}
-        aria-controls="suggest-list"
-      />
-
-      {loading && <span className="loading-spin" aria-hidden />}
-
-      {value && !loading && (
-        <button
-          type="button"
-          className="clear-btn"
-          aria-label="Clear search"
-          onMouseDown={(e) => e.preventDefault()}   // keep input focused
-          onClick={() => { onChange(""); setShowSuggest(false); }}
-          title="Clear"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </button>
-      )}
-
-      {showSuggest && suggestions.length > 0 && (
-        <div id="suggest-list" role="listbox" className="suggest" ref={listRef}>
-          {suggestions.map((s, i) => (
-            <button
-              key={`${s.value}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              className="suggest-item"
-              onMouseEnter={() => setActive(i)}
-              onClick={() => onPickSuggestion(s)}
-            >
-              <span className="label">{s.label || s.value}</span>
-              <span className="type">{s.type === "industry" ? "Industry" : "Company"}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 

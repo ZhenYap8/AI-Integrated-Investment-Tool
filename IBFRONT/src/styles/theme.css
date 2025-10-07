@@ -1,0 +1,149 @@
+/* src/styles/theme.css */
+:root {
+  --bg: #f7f9fc;            /* page background (light) */
+  --surface: #ffffff;        /* cards, nav, footer */
+  --text: #0f172a;           /* primary text */
+  --muted: #475569;          /* secondary text */
+  --border: #e2e8f0;         /* dividers */
+}
+
+.dark-mode {
+  --bg: #0b1220;             /* page background (dark) */
+  --surface: #0f172a;        /* panels */
+  --text: #e5e7eb;           /* primary text */
+  --muted: #94a3b8;          /* secondary text */
+  --border: #1f2937;         /* dividers */
+}
+
+html, body {
+  height: 100%;
+}
+
+html, body, #root {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.layout {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid transparent; /* blend */
+}
+
+.navbar .brand {
+  color: var(--text);
+}
+
+.nav-link { color: #334155; }
+.nav-link.active { color: #2563eb; }
+
+.toggle-theme {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.main-content {
+  flex: 1;
+  background: var(--bg);
+}
+
+.footer {
+  background: var(--bg);
+  border-top: 1px solid transparent; /* blend */
+}
+
+/* Common surfaces */
+.card, .rounded-2xl, .search-wrap input, .suggest, .table, .empty, .thresh-grid input {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Soften boxes to blend into the page */
+.card, .empty {
+  background: var(--bg);
+  border: 0 !important;
+  box-shadow: none;
+}
+
+.border, .table, .suggest, .rounded-2xl, .card, .search-wrap input {
+  border-color: var(--border);
+}
+
+/* Further soften any remaining panel chrome */
+.rounded-2xl, .table, .suggest { box-shadow: none; }
+
+/* Segmented control blends with page */
+.segmented {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+/* Tables: remove outer border, keep light row dividers */
+.table {
+  border: 0;
+  background: var(--bg);
+}
+.table th, .table td {
+  border-bottom: 1px solid var(--border);
+}
+
+/* Tables fully flat except row dividers */
+.table thead th { background: transparent; }
+.table tbody tr:nth-child(odd) { background: transparent; }
+
+.sub { color: var(--muted); }
+
+/* Ghost-style controls so UI blends into background */
+.btn-range {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text);
+}
+.btn-range:hover {
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  border-color: var(--border);
+}
+.btn-range.active,
+.btn-range[aria-pressed="true"] {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+/* Inputs blend with page */
+.search-wrap input,
+.thresh-grid input,
+input[type="text"], input[type="number"], input[type="search"] {
+  background: var(--bg) !important;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.search-wrap input:focus,
+.thresh-grid input:focus,
+input[type="text"]:focus, input[type="number"]:focus, input[type="search"]:focus {
+  outline: none;
+  border-color: var(--border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+/* Keep suggestion dropdown legible on a soft surface */
+.suggest { background: var(--surface); }
+
+/* Optional: soften badges/pills */
+.badge { background: color-mix(in srgb, var(--surface) 60%, transparent); border: 1px solid var(--border); }
+
+/* Links and small pills stay unobtrusive */
+.badge { box-shadow: none; }

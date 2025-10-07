@@ -1,6 +1,8 @@
 // src/App.jsx
-import InvestmentAgentUI from "./InvestmentAgentUI.jsx";
+import React from "react";
+import "./styles.css";
+import AppRouter from "./AppRouter.jsx";
 
 export default function App() {
-  return <InvestmentAgentUI />;
+  return <AppRouter />;
 }

@@ -134,39 +134,37 @@ export function fmtCurrency(v) {
   }
 }
 
-export function Bullets({ title, items = [], tone = "gray" }) {
-  const toneMap = { green: "border-green-200", amber: "border-yellow-200", red: "border-red-200", gray: "border-slate-200" };
+export function Bullets({ title, items = [], tone = 'green' }) {
+  const toneClass = tone === "green" ? "text-green-700 dark:text-green-400" : 
+                   tone === "amber" ? "text-amber-700 dark:text-amber-400" : 
+                   "text-red-700 dark:text-red-400";
+  const bgClass = tone === "green" ? "bg-green-50 dark:bg-green-950/30" : 
+                  tone === "amber" ? "bg-amber-50 dark:bg-amber-950/30" : 
+                  "bg-red-50 dark:bg-red-950/30";
+
   return (
     <div>
-      <h4 className="font-semibold mb-2">{title}</h4>
-      {(!items || items.length === 0) && <p className="text-sm text-slate-500 dark:text-slate-400">No items available.</p>}
-      <ul className="space-y-2">
-        {items.map((it, i) => (
-          <li key={i} className={`rounded-xl border ${toneMap[tone]} p-3 bg-slate-50 dark:bg-slate-800/40`}>
-            <div className="text-sm">{it.text}</div>
-            {it.source && (
-              <a className="text-xs text-blue-700 hover:underline" href={it.source} target="_blank" rel="noreferrer">
-                Source
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
+      <h3 className={`text-sm font-semibold ${toneClass} mb-2`}>{title}</h3>
+      {!items || items.length === 0 ? (
+        <div className={`${bgClass} rounded-lg p-3 text-sm text-slate-600 dark:text-slate-400 italic`}>
+          No items identified for this analysis period.
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item, i) => (
+            <li key={i} className={`${bgClass} rounded-lg p-3 text-sm leading-relaxed`}>
+              <span className="font-medium">
+                {/* Handle both string items and object items */}
+                {typeof item === 'string' ? item : item.item || item.text || item}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-export function ScoreItem({ label, verdict, detail }) {
-  const tone = verdict === "green" ? "green" : verdict === "red" ? "red" : "amber";
-  const pillClass = tone === "green" ? "pill green" : tone === "red" ? "pill red" : "pill amber";
-
-  return (
-    <div className="score-card">
-      <div className="score-head">
-        <div style={{ fontWeight: 600 }}>{label}</div>
-        <span className={pillClass}>{(verdict || "amber").toUpperCase()}</span>
-      </div>
-      {detail && <div className="sub" style={{ marginTop: 6 }}>{detail}</div>}
-    </div>
-  );
-}
+// ScoreItem removed - now using dedicated component in /components/ScoreItem.jsx
+// This component has been replaced with a more feature-rich version that supports
+// value, threshold, and unit props for better scorecard display

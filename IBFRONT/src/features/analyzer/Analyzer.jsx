@@ -212,7 +212,7 @@ export default function Analyzer() {
           {/* Move ROE trend to the top of results, just below the year presets */}
           <Card>
             <h3 className="section-title">Return on Equity (ROE) Chart</h3>
-            <PriceChart series={series} height={220} />
+            <PriceChart series={series} height={300} />
           </Card>
 
           <Card>

@@ -28,8 +28,28 @@ function usePageTitle(location) {
   }, [location]);
 }
 
-function Logo() {
-  return <div className="h-6 w-6 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 grid place-items-center text-white text-[10px] font-bold">LOGO</div>;
+function Logo({ src = "/sudutinvest.png", alt = "Sudut Invest", size = 100 }) { // increased default size from 24 to 40
+  const fallback = (
+    <div
+      className="rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 grid place-items-center text-white font-bold select-none"
+      style={{ width: size, height: size, fontSize: Math.max(12, size * 0.34) }}
+      aria-label={alt}
+    >
+      SI
+    </div>
+  );
+  if (!src) return fallback;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={size}
+      height={size}
+      loading="lazy"
+      onError={(e) => { e.currentTarget.replaceWith(fallback); }}
+      style={{ width: size, height: size, objectFit: 'contain', display: 'block' }}
+    />
+  );
 }
 
 export default function SiteChrome({ children }) {
@@ -43,8 +63,10 @@ export default function SiteChrome({ children }) {
         <nav className="navbar">
           <div className="navbar-content">
             <div className="navbar-left">
-              <Logo />
-              <Link to="/" className="brand">Sudut Invest</Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Logo />
+                <Link to="/" className="brand" style={{ margin: 0, lineHeight: 1 }}>Sudut Invest</Link>
+              </div>
             </div>
             <div className="navbar-right">
               <Nav to="/analyze">Analyse</Nav>
@@ -60,7 +82,7 @@ export default function SiteChrome({ children }) {
 
         <footer className="footer">
           <div className="footer-content">
-            <span>© {new Date().getFullYear()} Sudut Invest</span>
+            <span style={{ fontSize: '3px', fontWeight: 600 }}>© {new Date().getFullYear()} Sudut Invest</span>
             <div className="footer-links">
               <Link to="/disclaimer">Not investment advice</Link>
               <a href="#sources">Sources</a>

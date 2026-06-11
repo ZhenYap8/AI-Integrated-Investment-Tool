@@ -399,8 +399,13 @@ def suggest(query: str, limit: int = 8) -> List[Dict[str, str]]:
     return out
 
 
-ALL_US_COMPANIES: List[Dict[str, str]] = load_us_tickers()
-GLOBAL_TICKERS: List[Dict[str, str]] = load_tickers()
+# Eager-load ticker universe locally; defer on Vercel to keep cold starts fast.
+if os.getenv("VERCEL"):
+    ALL_US_COMPANIES = demo_companies()
+    GLOBAL_TICKERS = demo_companies()
+else:
+    ALL_US_COMPANIES = load_us_tickers()
+    GLOBAL_TICKERS = load_tickers()
 
 __all__ = [
     "DEMO_INDUSTRIES",

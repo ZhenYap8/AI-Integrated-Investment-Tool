@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 from typing import Optional
+import os
 
 from routers.api2 import router
 from data.universe_extension import load_tickers, exchange_label
@@ -38,7 +39,7 @@ app.include_router(router)
 
 @app.get("/api/tickers")
 async def api_tickers(
-    max_count: int = Query(2000, ge=1, le=10000),
+    max_count: int = Query(500 if os.getenv("VERCEL") else 2000, ge=1, le=10000),
     exchange: Optional[str] = Query(None),
 ):
     try:

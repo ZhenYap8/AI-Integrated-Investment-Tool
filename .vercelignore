@@ -1,0 +1,9 @@
+IBBack/__pycache__
+**/__pycache__
+**/*.pyc
+IBFRONT/node_modules
+.git
+archived
+playbooks
+*.md
+!README.md

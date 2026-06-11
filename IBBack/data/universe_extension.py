@@ -399,7 +399,7 @@ def suggest(query: str, limit: int = 8) -> List[Dict[str, str]]:
     return out
 
 
-# Eager-load ticker universe locally; defer on Vercel to keep cold starts fast.
+# Eager-load ticker universe locally; defer only on Vercel serverless cold starts.
 if os.getenv("VERCEL"):
     ALL_US_COMPANIES = demo_companies()
     GLOBAL_TICKERS = demo_companies()

@@ -1,0 +1,41 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: Render Dashboard → New → Blueprint → connect this repo
+
+services:
+  # FastAPI backend
+  - type: web
+    name: sudut-invest-api
+    runtime: python
+    region: singapore
+    plan: free
+    rootDir: IBBack
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app2:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1
+      - key: NEWS_API_KEY
+        sync: false
+
+  # React frontend (static)
+  - type: web
+    name: sudut-invest-web
+    runtime: static
+    rootDir: IBFRONT
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: sudut-invest-api
+          property: url

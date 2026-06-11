@@ -38,4 +38,4 @@ services:
         fromService:
           type: web
           name: sudut-invest-api
-          property: url
+          property: host

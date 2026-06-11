@@ -1,5 +1,14 @@
 // src/lib/api.js
-export const API_BASE = import.meta.env?.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, "") : "";
+function normalizeApiBase(raw) {
+  let base = (raw || "").trim().replace(/\/$/, "");
+  if (!base) return "";
+  if (!/^https?:\/\//i.test(base)) {
+    base = `https://${base}`;
+  }
+  return base;
+}
+
+export const API_BASE = normalizeApiBase(import.meta.env?.VITE_API_URL);
 export const api = (path) => `${API_BASE}${path}`;
 
 export async function fetchJSON(input, init) {

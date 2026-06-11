@@ -1,6 +1,7 @@
 from __future__ import annotations
 import datetime as dt
-from typing import List
+import re
+from typing import List, Optional
 
 try:
     from IBBack.models.schemas2 import Finding, Evidence
@@ -16,6 +17,20 @@ except Exception:
             def __init__(self, **kwargs):
                 for k, v in kwargs.items():
                     setattr(self, k, v)
+
+try:
+    from .news_sources import aggregate_news
+except Exception:
+    from services.prosandcons.news_sources import aggregate_news
+
+_CON_RE = re.compile(
+    r"\b(layoff|lawsuit|decline|fall|drop|cut|miss|warn|investigation|probe|recall|"
+    r"sanction|slump|tumble|plunge|loss|debt|downgrade|fine|ban|hack|breach)\b", re.I
+)
+_PRO_RE = re.compile(
+    r"\b(deal|partnership|launch|record|growth|beat|raise|expand|win|approve|surge|"
+    r"contract|invest|partners|alliance|milestone|breakthrough)\b", re.I
+)
 
 _DEF_PRO_M_OP_MARGIN = 0.20
 _DEF_CON_P_LOW_MARGIN = 0.05
@@ -83,4 +98,68 @@ def fallback_findings_from_yf(ticker: str, info: dict) -> List[Finding]:
 
     return findings[:6]
 
-__all__ = ['fallback_findings_from_yf']
+
+def _headline_to_finding(article, direction: str) -> Finding:
+    snippet = (article.snippet or article.title or "")[:300]
+    item = (
+        f"{article.outlet} ({article.date}): {article.title}. "
+        f"This matters because recent coverage from major outlets can shift investor expectations "
+        f"and price action ahead of the next earnings update."
+    )
+    if snippet and snippet != article.title:
+        item = (
+            f"{article.outlet}: {article.title} — {snippet[:160]}. "
+            f"Investors should weigh this headline against fundamentals because news flow often "
+            f"moves sentiment before financials fully reflect the story."
+        )
+    return Finding(
+        item=item[:420],
+        factor="other",
+        direction=direction,
+        timeframe="near_term",
+        materiality=0.55,
+        evidence=[Evidence(
+            url=article.url,
+            date=article.date or dt.date.today().isoformat(),
+            snippet=snippet,
+            source=article.outlet,
+        )],
+    )
+
+
+def fallback_findings_from_news(
+    ticker: str,
+    company_name: str,
+    ticker_obj=None,
+    max_items: int = 8,
+) -> List[Finding]:
+    """Build findings from Reuters, Bloomberg, BBC, CNBC, etc. when AI is unavailable."""
+    articles = aggregate_news(ticker, company_name, ticker_obj=ticker_obj, total_limit=max_items + 4)
+    if not articles:
+        return []
+
+    pros: List[Finding] = []
+    cons: List[Finding] = []
+    neutral: List[Finding] = []
+
+    for a in articles:
+        blob = f"{a.title} {a.snippet or ''}"
+        if _CON_RE.search(blob):
+            cons.append(_headline_to_finding(a, "con"))
+        elif _PRO_RE.search(blob):
+            pros.append(_headline_to_finding(a, "pro"))
+        else:
+            neutral.append(_headline_to_finding(a, "pro" if len(pros) <= len(cons) else "con"))
+
+    findings: List[Finding] = []
+    half = max(1, max_items // 2)
+    findings.extend(pros[:half])
+    findings.extend(cons[:half])
+    if len(findings) < max_items:
+        for f in neutral:
+            if f not in findings and len(findings) < max_items:
+                findings.append(f)
+    return findings[:max_items]
+
+
+__all__ = ['fallback_findings_from_yf', 'fallback_findings_from_news']

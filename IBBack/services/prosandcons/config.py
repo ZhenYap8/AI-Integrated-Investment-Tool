@@ -22,10 +22,16 @@ OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '2200'))
 OPENAI_SEED = int(os.getenv('OPENAI_SEED', '7'))
 OPENAI_TIMEOUT = int(os.getenv('OPENAI_TIMEOUT', '45'))
 
+# Multi-source news (optional NewsAPI key — Yahoo + Google News work without a key)
+NEWS_API_KEY = os.getenv('NEWS_API_KEY') or os.getenv('NEWSAPI_KEY')
+NEWS_TOTAL_LIMIT = int(os.getenv('NEWS_TOTAL_LIMIT', '14'))
+NEWS_ABSTRACT_LIMIT = int(os.getenv('NEWS_ABSTRACT_LIMIT', '6'))
+
 @lru_cache(maxsize=1)
 def openai_enabled() -> bool:
     return bool(OPENAI_API_KEY)
 
 __all__ = [
-    'OPENAI_API_KEY','OPENAI_API_BASE','OPENAI_MODEL','OPENAI_MAX_TOKENS','OPENAI_SEED','OPENAI_TIMEOUT','openai_enabled'
+    'OPENAI_API_KEY','OPENAI_API_BASE','OPENAI_MODEL','OPENAI_MAX_TOKENS','OPENAI_SEED','OPENAI_TIMEOUT',
+    'NEWS_API_KEY','NEWS_TOTAL_LIMIT','NEWS_ABSTRACT_LIMIT','openai_enabled'
 ]

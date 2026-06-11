@@ -8,10 +8,10 @@ from services.analysis.thresholds import ThresholdManager
 _analyzer = FinancialAnalyzer()
 
 # Public API functions (maintain backward compatibility)
-def analyze_company(ticker: str, years: int, thresh: Dict[str, float], period: Optional[str] = None) -> AnalyzeResponse:
+def analyze_company(ticker: str, years: Optional[int], thresh: Dict[str, float], period: Optional[str] = None) -> AnalyzeResponse:
     return _analyzer.analyze_company(ticker, years, thresh, period)
 
-def analyze_industry(industry: str, years: int, thresh: Dict[str, float], period: Optional[str] = None) -> AnalyzeResponse:
+def analyze_industry(industry: str, years: Optional[int], thresh: Dict[str, float], period: Optional[str] = None) -> AnalyzeResponse:
     return _analyzer.analyze_industry(industry, years, thresh, period)
 
 def cleanup_cache(max_age_seconds: int = 600):

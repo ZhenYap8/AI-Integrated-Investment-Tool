@@ -81,12 +81,10 @@ def avg_last_n(series: Optional['pd.Series'], n: int) -> Optional[float]:
     return avg
 
 
-def split_first_last(series: Optional['pd.Series'], years: int) -> Tuple[Optional[float], Optional[float], Optional[int]]:
-    if series is None or years is None or years <= 0:
+def split_first_last(series: Optional['pd.Series'], years: Optional[int]) -> Tuple[Optional[float], Optional[float], Optional[int]]:
+    if series is None or len(series) < 2:
         return None, None, None
-    if len(series) < 2:
-        return None, None, None
-    n: int = min(years, len(series) - 1)
+    n: int = (len(series) - 1) if years is None or years <= 0 else min(years, len(series) - 1)
     try:
         first_val: float = float(series.iloc[-(n+1)])
         last_val: float = float(series.iloc[-1])
@@ -105,7 +103,12 @@ def ratio_safe(num: Optional[float], den: Optional[float]) -> Optional[float]:
         return None
 
 
-def build_historical_roe(net_income: Optional['pd.Series'], equity: Optional['pd.Series'], years: Optional[int] = None) -> List[Dict[str, Any]]:
+def build_historical_roe(
+    net_income: Optional['pd.Series'],
+    equity: Optional['pd.Series'],
+    years: Optional[int] = None,
+    months: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     if net_income is None or equity is None:
         return []
     try:
@@ -131,15 +134,64 @@ def build_historical_roe(net_income: Optional['pd.Series'], equity: Optional['pd
                 items.append({"_ts": d, "roe": roe_pct, "y": roe_pct})
             except Exception:
                 continue
-        if years and items:
+        if items and (months or years):
             last_ts: Any = items[-1]["_ts"]
             try:
                 import pandas as pd_import
-                cutoff: Any = last_ts - pd_import.DateOffset(years=years)
+                if months:
+                    cutoff: Any = last_ts - pd_import.DateOffset(months=months)
+                else:
+                    cutoff = last_ts - pd_import.DateOffset(years=years)
                 items = [it for it in items if it["_ts"] >= cutoff]
             except Exception:
                 pass
-        out: List[Dict[str, Any]] = [{"date": (ts.isoformat() if hasattr(ts, "isoformat") else str(ts)), "roe": it["roe"], "y": it["y"]} for it in items for ts in [it["_ts"]]]
+        out: List[Dict[str, Any]] = [
+            {"date": (ts.isoformat() if hasattr(ts, "isoformat") else str(ts)), "roe": it["roe"], "y": it["y"]}
+            for it in items for ts in [it["_ts"]]
+        ]
         return out
     except Exception:
         return []
+
+
+def build_historical_roe_for_ticker(
+    ticker_obj,
+    *,
+    period: Optional[str] = None,
+    years: Optional[int] = None,
+    coalesce=None,
+) -> Tuple[List[Dict[str, Any]], str]:
+    """
+    Build ROE time series using quarterly or annual filings based on lookback.
+    Returns (series, granularity) where granularity is 'quarterly' or 'annual'.
+    """
+    from services.analysis.base import BaseAnalyzer
+
+    use_quarterly = BaseAnalyzer.uses_quarterly_roe(period, years)
+    months = BaseAnalyzer.resolve_lookback_months(period, years)
+
+    if use_quarterly:
+        fin = getattr(ticker_obj, 'quarterly_financials', None)
+        if fin is None or (hasattr(fin, 'empty') and fin.empty):
+            fin = getattr(ticker_obj, 'quarterly_income_stmt', None)
+        bs = getattr(ticker_obj, 'quarterly_balance_sheet', None)
+        granularity = "quarterly"
+    else:
+        fin = getattr(ticker_obj, 'financials', None)
+        if fin is None or (hasattr(fin, 'empty') and fin.empty):
+            fin = getattr(ticker_obj, 'income_stmt', None)
+        bs = getattr(ticker_obj, 'balance_sheet', None)
+        granularity = "annual"
+
+    net_income = get_row(fin, 'Net Income')
+    equity_row = get_row(bs, 'Total Stockholder Equity')
+    equity_alt = get_row(bs, 'Total Equity Gross Minority Interest')
+    equity = coalesce(equity_row, equity_alt) if coalesce else (equity_row or equity_alt)
+
+    series = build_historical_roe(
+        net_income,
+        equity,
+        years=years if not use_quarterly else None,
+        months=months if use_quarterly else None,
+    )
+    return series, granularity

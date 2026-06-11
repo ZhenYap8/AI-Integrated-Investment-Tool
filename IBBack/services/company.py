@@ -1,5 +1,5 @@
 from models.schemas import AnalyzeResponse, ValuationBlock, ValuationRow, BulletItem, SourceItem, ScoreItem
-from utils.finance import get_yf_ticker, get_row, safe_pct, last_value
+from utils.finance2 import get_yf_ticker, get_row, safe_pct, last_value
 from services.metrics import (
     calculate_revenue_cagr,
     calculate_operating_margin,

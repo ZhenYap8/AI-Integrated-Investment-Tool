@@ -1,4 +1,7 @@
 // src/components/NumField.jsx
+// a numeric input field with label, suffix, and hint
+
+
 import React from "react";
 export default function NumField({ label, suffix, value, placeholder, onChange, onBlur, hint }) {
   return (

@@ -49,6 +49,7 @@ class Evidence(BaseModel):
     url: str
     date: str  # YYYY-MM-DD
     snippet: str
+    source: Optional[str] = None  # outlet e.g. Reuters, BBC
 
 class Finding(BaseModel):
     item: str
@@ -63,3 +64,5 @@ class ProsConsResponse(BaseModel):
     asOf: str
     findings: List[Finding]
     fromAI: bool = False
+    mode: str = "metrics"  # ai | news | metrics
+    headlines: List[Dict[str, Any]] = Field(default_factory=list)

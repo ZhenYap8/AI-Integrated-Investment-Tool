@@ -1,25 +1,27 @@
 // src/components/ScoreItem.jsx
 import React from 'react';
 
-/**
- * ScoreItem Component
- * Displays a single scorecard metric with verdict badge
- */
 const ScoreItem = ({ label, verdict, detail, value, threshold, unit, loading }) => {
+  const verdictClass = verdict === 'green' ? 'pass' : verdict === 'amber' ? 'warn' : 'fail';
+
   return (
-    <div className={`score-card ${loading ? 'loading' : ''}`}>
+    <div className={`score-card score-${verdictClass} ${loading ? 'loading' : ''}`}>
       <div className="score-head">
-        <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>{label}</span>
+        <span className="score-label">{label}</span>
         {!loading && verdict && (
-          <span className={`pill ${verdict}`}>{verdict?.toUpperCase()}</span>
+          <span className={`pill ${verdict}`}>{verdict === 'green' ? 'PASS' : verdict === 'amber' ? 'WARN' : 'FAIL'}</span>
         )}
-        {loading && (
-          <span className="pill" style={{ backgroundColor: '#e5e7eb', color: '#9ca3af' }}>...</span>
-        )}
+        {loading && <span className="pill">…</span>}
       </div>
-      <div style={{ fontSize: '0.85rem', color: loading ? 'var(--muted)' : 'var(--text)', marginTop: '8px' }}>
-        {detail || 'Loading...'}
-      </div>
+      {!loading && value != null && (
+        <div className="score-value">
+          {value}{unit === '%' ? '%' : unit === 'x' ? 'x' : unit || ''}
+          {threshold != null && (
+            <span className="score-threshold"> vs {threshold}{unit === '%' ? '%' : unit === 'x' ? 'x' : ''}</span>
+          )}
+        </div>
+      )}
+      <div className="score-detail">{detail || (loading ? 'Loading…' : '')}</div>
     </div>
   );
 };

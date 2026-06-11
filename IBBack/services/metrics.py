@@ -1,4 +1,4 @@
-from utils.finance import cagr, ratio_safe, last_value, avg_last_n, get_row, split_first_last
+from utils.finance2 import cagr, ratio_safe, last_value, avg_last_n, get_row, split_first_last
 from typing import Optional
 
 def calculate_revenue_cagr(rev, years):

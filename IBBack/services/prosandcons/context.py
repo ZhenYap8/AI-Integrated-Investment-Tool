@@ -18,14 +18,9 @@ except Exception:
             return _Dummy()
 
 try:
-    import trafilatura  # type: ignore
+    from .news_sources import aggregate_news, format_news_for_context
 except Exception:
-    trafilatura = None
-
-_ABSTRACT_MAX = 600
-
-_DEF_NEWS_LIMIT = 6
-_DEF_ABSTRACT_LIMIT = 5
+    from services.prosandcons.news_sources import aggregate_news, format_news_for_context
 
 def get_yf_ticker_safe(ticker: str):
     try:
@@ -49,19 +44,6 @@ def _perf_series(t, period: str) -> Optional[float]:
         return (last/first - 1.0) * 100.0
     except Exception:
         return None
-
-def _abstract(url: str) -> str:
-    if trafilatura is None:
-        return "(abstract unavailable)"
-    try:
-        downloaded = trafilatura.fetch_url(url, no_ssl=True, timeout=8)
-        if not downloaded:
-            return "(fetch failed)"
-        text = trafilatura.extract(downloaded, include_comments=False, include_formatting=False) or ''
-        text = re.sub(r"\s+", " ", text).strip()
-        return text[:_ABSTRACT_MAX]
-    except Exception:
-        return "(abstract error)"
 
 def build_context(ticker: str) -> str:
     t = get_yf_ticker_safe(ticker)
@@ -101,19 +83,14 @@ def build_context(ticker: str) -> str:
     pb = [f"{k.replace('mo','m')}={v:.1f}%" for k,v in perf.items() if isinstance(v,(int,float))]
     if pb:
         lines.append("Performance: "+", ".join(pb))
-    news = getattr(t,'news',[]) or []
-    if news:
-        lines.append("Recent News:")
-        for n in news[:_DEF_NEWS_LIMIT]:
-            ts = n.get('providerPublishTime'); date = dt.datetime.utcfromtimestamp(ts).date().isoformat() if ts else ''
-            title = (n.get('title','') or '')[:180]; url = n.get('link','') or ''
-            lines.append(f"- {date} {title}: {url}")
-        lines.append("News abstracts:")
-        for n in news[:_DEF_ABSTRACT_LIMIT]:
-            u = n.get('link','') or ''
-            if not u: continue
-            title = (n.get('title','') or '')[:140]
-            lines.append(f"- {title}\n  URL: {u}\n  Abstract: {_abstract(u)}")
+
+    # Multi-source news: Yahoo + Google News (Reuters, FT, Bloomberg, BBC, CNBC, WSJ…) + optional NewsAPI
+    articles = aggregate_news(ticker, name, ticker_obj=t)
+    if articles:
+        lines.extend(format_news_for_context(articles))
+    else:
+        lines.append("Recent News: (no headlines fetched)")
+
     return "\n".join(lines)
 
 __all__ = ['build_context','get_yf_ticker_safe']

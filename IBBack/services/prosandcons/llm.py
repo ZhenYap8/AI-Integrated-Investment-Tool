@@ -27,17 +27,25 @@ from .filters import (
 )
 
 _SYSTEM_RULES = (
-    "You are an equity analyst. Return a JSON OBJECT with key 'findings' (ARRAY).\n"
-    "Each finding: item (2–3 sentences; explain mechanism + WHY IT MATTERS), factor [growth|margins|leverage|competition|guidance|legal_esg|other], "
-    "direction 'pro'|'con', timeframe [near_term|multi_year|unspecified], materiality 0..1, evidence: [ {url, date:'YYYY-MM-DD', snippet<=300} ].\n"
+    "You are a concise equity research analyst. Return a JSON OBJECT with key 'findings' (ARRAY).\n"
+    "Each finding:\n"
+    "  item — exactly 1–2 sentences. Lead with the insight, then one causal 'because/so' clause. "
+    "Vary sentence openings (avoid repeating 'The company' or 'This'). Include a specific number when available.\n"
+    "  factor — one of: growth|margins|leverage|competition|guidance|legal_esg|valuation|other\n"
+    "  direction — 'pro' or 'con'\n"
+    "  timeframe — near_term|multi_year|unspecified\n"
+    "  materiality — 0.0 to 1.0\n"
+    "  evidence — [{url, date:'YYYY-MM-DD', snippet<=200, source:'Reuters|BBC|…'}]\n"
     "Rules:\n"
-    "- Forbidden boilerplate: 'Strong top-line growth', 'High operating margins', 'Solid ROE', 'robust fundamentals', 'leading position', 'poised to grow/benefit', 'strong balance sheet', 'healthy margins'.\n"
-    "- Provide causal/company-specific reasoning with metrics (%, x, $, bps) or named catalysts/events.\n"
-    "- Use ONLY the supplied Yahoo Finance snapshot + News abstracts; cite their URLs.\n"
-    "- Rank by decision-useful materiality; mix pros and cons when both exist."
+    "- BANNED phrases: 'robust fundamentals', 'leading position', 'poised to', 'strong balance sheet', "
+    "'healthy margins', 'solid ROE', 'well-positioned', 'attractive valuation' without numbers.\n"
+    "- Each finding must cite a metric (%, x, $B) OR a named event/product/regulation from the context.\n"
+    "- Use ONLY supplied Yahoo Finance data + multi-source news abstracts (Reuters, FT, Bloomberg, BBC, CNBC, etc.). Cite the article URL from context.\n"
+    "- Prioritise decision-useful insights. Include both pros and cons when evidence supports each.\n"
+    "- Write for a smart investor skimming — no filler, no repetition across findings."
 )
 
-_DEF_MIN_LEN = 110  # slightly relaxed for recall
+_DEF_MIN_LEN = 60  # shorter, punchier findings
 
 
 def _build_messages(context: str, max_items: int, focus: Optional[str]) -> list:
@@ -105,7 +113,8 @@ def llm_findings(context: str, *, max_items: int = 8, focus: Optional[str] = Non
                     continue
                 date = (e.get("date") or dt.date.today().isoformat()).strip()
                 snippet = (e.get("snippet") or "(see source)").strip()[:300]
-                ev_models.append(Evidence(url=url, date=date, snippet=snippet))
+                source = (e.get("source") or "").strip() or None
+                ev_models.append(Evidence(url=url, date=date, snippet=snippet, source=source))
             if not ev_models:
                 continue
             if not numbers_consistent(item, [e.snippet for e in ev_models]):

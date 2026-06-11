@@ -1,8 +1,7 @@
 """Industry analysis - simplified aggregation."""
 import datetime as dt
-from typing import List, Dict
+from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 from models.schemas2 import AnalyzeResponse, ValuationBlock, BulletItem, SourceItem, ScoreItem
 from data.universe2 import INDUSTRY_MAP
 from .base import BaseAnalyzer
@@ -15,7 +14,7 @@ class IndustryAnalyzer(BaseAnalyzer):
         super().__init__()
         self.company_analyzer = None  # Will use CompanyAnalyzer if needed
     
-    def analyze(self, industry: str, years: int, thresh: Dict[str, float], period=None) -> AnalyzeResponse:
+    def analyze(self, industry: str, years: Optional[int], thresh: Dict[str, float], period=None) -> AnalyzeResponse:
         tickers = INDUSTRY_MAP.get(industry, [])
         if not tickers:
             return self._empty_response(industry)

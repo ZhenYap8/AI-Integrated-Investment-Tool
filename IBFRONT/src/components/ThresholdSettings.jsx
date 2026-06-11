@@ -1,120 +1,41 @@
 import React from 'react';
+import Card from './Card.jsx';
+import NumField from './NumField.jsx';
 
-const ThresholdSettings = ({ 
-  thresholds, 
-  setThresholds, 
-  onApply, 
-  onReset 
-}) => {
-  const handleChange = (key, value) => {
-    setThresholds(prev => ({
-      ...prev,
-      [key]: parseFloat(value) || 0
-    }));
-  };
+const DEFAULT_THRESH = { rev_cagr_min: 5, op_margin_min: 10, nd_eq_max: 1.0, interest_cover_min: 4.0, roe_min: 10 };
 
+const ThresholdSettings = ({ thresholds, setThresholds, onApply, onReset, loading = false, query = '' }) => {
   return (
-    <div className="thresh-grid">
-      <div className="field">
-        <label className="field-label">
-          Revenue Growth <span className="muted">(CAGR)</span>
-        </label>
-        <div className="field-input">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            value={thresholds.rev_cagr_min}
-            onChange={(e) => handleChange('rev_cagr_min', e.target.value)}
-          />
-          <div className="adorn">%</div>
-        </div>
+    <Card>
+      <h3 className="section-title">Thresholds</h3>
+      <p className="text-sm text-slate-500 mb-4">
+        Configure thresholds that will be used for scorecard evaluation.
+      </p>
+      <div className="thresh-grid">
+        <NumField label="Revenue CAGR min" value={thresholds.rev_cagr_min} onChange={(v)=>setThresholds(t=>({...t, rev_cagr_min:v}))} suffix="%" hint="1-10y" />
+        <NumField label="Operating margin min" value={thresholds.op_margin_min} onChange={(v)=>setThresholds(t=>({...t, op_margin_min:v}))} suffix="%" />
+        <NumField label="Net debt / Equity max" value={thresholds.nd_eq_max} onChange={(v)=>setThresholds(t=>({...t, nd_eq_max:v}))} suffix="x" />
+        <NumField label="Interest coverage min" value={thresholds.interest_cover_min} onChange={(v)=>setThresholds(t=>({...t, interest_cover_min:v}))} suffix="x" />
+        <NumField label="ROE min" value={thresholds.roe_min} onChange={(v)=>setThresholds(t=>({...t, roe_min:v}))} suffix="%" />
       </div>
-
-      <div className="field">
-        <label className="field-label">
-          Operating Margin <span className="muted">(min)</span>
-        </label>
-        <div className="field-input">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            value={thresholds.op_margin_min}
-            onChange={(e) => handleChange('op_margin_min', e.target.value)}
-          />
-          <div className="adorn">%</div>
-        </div>
-      </div>
-
-      <div className="field">
-        <label className="field-label">
-          Net Debt/Equity <span className="muted">(max)</span>
-        </label>
-        <div className="field-input">
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="10"
-            value={thresholds.nd_eq_max}
-            onChange={(e) => handleChange('nd_eq_max', e.target.value)}
-          />
-          <div className="adorn">x</div>
-        </div>
-      </div>
-
-      <div className="field">
-        <label className="field-label">
-          Interest Coverage <span className="muted">(min)</span>
-        </label>
-        <div className="field-input">
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            max="50"
-            value={thresholds.interest_cover_min}
-            onChange={(e) => handleChange('interest_cover_min', e.target.value)}
-          />
-          <div className="adorn">x</div>
-        </div>
-      </div>
-
-      <div className="field">
-        <label className="field-label">
-          ROE <span className="muted">(min)</span>
-        </label>
-        <div className="field-input">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            value={thresholds.roe_min}
-            onChange={(e) => handleChange('roe_min', e.target.value)}
-          />
-          <div className="adorn">%</div>
-        </div>
-      </div>
-
-      <div className="thresh-actions">
+      <div className="thresh-actions" style={{ marginTop: 8 }}>
+        <button className="btn-range" onClick={onApply} disabled={loading || !query}>Apply Thresholds</button>
         <button
-          className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
-          onClick={onApply}
-        >
-          Apply
-        </button>
-        <button
-          className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50"
-          onClick={onReset}
+          className="btn-range"
+          onClick={() => {
+            if (typeof setThresholds === 'function') {
+              setThresholds(DEFAULT_THRESH);
+            }
+            if (typeof onReset === 'function') {
+              try { onReset(); } catch (e) { /* ignore onReset errors */ }
+            }
+          }}
+          style={{ marginLeft: 8 }}
         >
           Reset
         </button>
       </div>
-    </div>
+    </Card>
   );
 };
 

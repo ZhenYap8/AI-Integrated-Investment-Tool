@@ -1,7 +1,20 @@
 import React, { useRef, useState } from "react";
 
-const API_BASE = "http://localhost:8000";
-const api = (path) => `${API_BASE}${path}`;
+const EXCHANGE_SHORT = {
+  US_NASDAQ: "NDQ",
+  US_OTHER: "NYSE",
+  TSX: "TSX",
+  LSE: "LSE",
+  ASX: "ASX",
+  HKEX: "HK",
+  TSE_JP: "TSE",
+  GLOBAL: "GLB",
+  INDEX: "IDX",
+  EURONEXT: "EUR",
+  XETRA: "ETR",
+  US_ADR: "ADR",
+  US_OTC: "OTC",
+};
 
 function SearchBar({
   value,
@@ -11,12 +24,11 @@ function SearchBar({
   showSuggest,
   setShowSuggest,
   loading,
-  onPickSuggestion
+  onPickSuggestion,
 }) {
   const [active, setActive] = useState(0);
   const listRef = useRef(null);
 
-  // keyboard nav
   const onKeyDown = (e) => {
     if (!showSuggest || suggestions.length === 0) {
       if (e.key === "Enter") onSubmit();
@@ -38,7 +50,7 @@ function SearchBar({
   };
 
   return (
-    <div className="search-wrap flex items-center">
+    <div className="search-wrap">
       <span className="search-icon" aria-hidden>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
@@ -54,8 +66,8 @@ function SearchBar({
         }}
         onFocus={() => setShowSuggest(true)}
         onKeyDown={onKeyDown}
-        placeholder="Search company or industry (e.g., NVDA, ABB, Robotics)…"
-        className="search flex-1"
+        placeholder="Search globally — NVDA, BP.L, SHOP.TO, 0700.HK, Robotics…"
+        className="search"
         aria-autocomplete="list"
         aria-expanded={showSuggest}
         aria-controls="suggest-list"
@@ -90,7 +102,14 @@ function SearchBar({
               onClick={() => onPickSuggestion(s)}
             >
               <span className="label">{s.label || s.value}</span>
-              <span className="type">{s.type === "industry" ? "Industry" : "Company"}</span>
+              <span className="suggest-badges">
+                {s.exchange && (
+                  <span className="exchange-badge">
+                    {s.exchangeLabel || EXCHANGE_SHORT[s.exchange] || s.exchange}
+                  </span>
+                )}
+                <span className="type">{s.type === "industry" ? "Industry" : "Company"}</span>
+              </span>
             </button>
           ))}
         </div>

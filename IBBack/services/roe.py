@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib.dates import AutoDateLocator, DateFormatter
 from matplotlib.ticker import FuncFormatter, MultipleLocator
 
-from utils.finance import ratio_safe
+from utils.finance2 import ratio_safe
 
 # Optional LOESS support
 try:  # pragma: no cover (optional dependency)

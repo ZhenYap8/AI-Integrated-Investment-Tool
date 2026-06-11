@@ -85,7 +85,6 @@ export default function SiteChrome({ children }) {
             <span style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>© {new Date().getFullYear()} Sudut Invest</span>
             <div className="footer-links">
               <Link to="/disclaimer">Not investment advice</Link>
-              <a href="#sources">Sources</a>
             </div>
           </div>
         </footer>

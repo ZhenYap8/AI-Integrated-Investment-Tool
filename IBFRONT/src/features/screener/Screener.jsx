@@ -147,28 +147,31 @@ export default function Screener() {
   const universeSummary = useMemo(() => computeSummary(items), [items]);
 
   const filtered = useMemo(() => {
+    const searching = Boolean(search.trim());
     const list = filterItems(items, {
       search,
       sector,
       grade: gradeFilter,
       preset,
       shortlist,
-      minMetrics: MIN_METRICS_FOR_RANK,
+      minMetrics: searching ? 0 : MIN_METRICS_FOR_RANK,
     });
     list.sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
     return list;
   }, [items, search, sector, gradeFilter, preset, shortlist]);
 
   const staleSample = useMemo(() => isLikelyAlphabeticalSample(items), [items]);
-  const hiddenLowData = useMemo(
-    () => items.length - filterItems(items, { search, sector, grade: gradeFilter, preset, shortlist, minMetrics: MIN_METRICS_FOR_RANK }).length,
-    [items, search, sector, gradeFilter, preset, shortlist],
-  );
+  const hiddenLowData = useMemo(() => {
+    if (search.trim()) return 0;
+    return items.length - filterItems(items, {
+      search, sector, grade: gradeFilter, preset, shortlist, minMetrics: MIN_METRICS_FOR_RANK,
+    }).length;
+  }, [items, search, sector, gradeFilter, preset, shortlist]);
 
   const displayed = useMemo(() => {
-    if (showAll) return filtered;
+    if (search.trim() || showAll) return filtered;
     return filtered.slice(0, TOP_N);
-  }, [filtered, showAll]);
+  }, [filtered, showAll, search]);
 
   const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
 
@@ -351,11 +354,13 @@ export default function Screener() {
         <Card className="screen-table-card">
           <div className="screen-table-header">
             <h3 className="section-title">
-              {showAll
-                ? `${displayed.length} of ${filtered.length} matches`
-                : `Top ${Math.min(TOP_N, filtered.length)} quality leaders`}
-              {!showAll && filtered.length > TOP_N ? ` · ${filtered.length} rankable` : ''}
-              {hiddenLowData > 0 ? ` · ${hiddenLowData} hidden (insufficient data)` : ''}
+              {search.trim()
+                ? `${displayed.length} result${displayed.length === 1 ? '' : 's'} for “${search.trim()}”`
+                : showAll
+                  ? `${displayed.length} of ${filtered.length} matches`
+                  : `Top ${Math.min(TOP_N, filtered.length)} quality leaders`}
+              {!search.trim() && !showAll && filtered.length > TOP_N ? ` · ${filtered.length} rankable` : ''}
+              {!search.trim() && hiddenLowData > 0 ? ` · ${hiddenLowData} hidden (insufficient data)` : ''}
             </h3>
             <div className="screen-table-header-actions">
               {hasActiveFilters && (
@@ -384,7 +389,9 @@ export default function Screener() {
             onToggleShortlist={onToggleShortlist}
             page={page}
             pageSize={PAGE_SIZE}
-            showPagination={showAll && displayed.length > PAGE_SIZE}
+            showPagination={Boolean(search.trim()) || (showAll && displayed.length > PAGE_SIZE)}
+            searchQuery={search.trim()}
+            universeSize={items.length}
           />
 
           {showAll && displayed.length > PAGE_SIZE && (

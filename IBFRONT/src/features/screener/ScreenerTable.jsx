@@ -45,6 +45,8 @@ export default function ScreenerTable({
   page = 1,
   pageSize = 50,
   showPagination = false,
+  searchQuery = '',
+  universeSize = 0,
 }) {
   const pageItems = showPagination
     ? items.slice((page - 1) * pageSize, page * pageSize)
@@ -61,7 +63,11 @@ export default function ScreenerTable({
   if (!items.length) {
     return (
       <div className="screen-table-wrap">
-        <div className="screen-empty">No stocks match your filters. Try a different preset or clear filters.</div>
+        <div className="screen-empty">
+          {searchQuery
+            ? `No “${searchQuery}” in the current universe (${universeSize} stocks loaded). Try a different spelling, clear filters, or click Apply settings to load S&P 500.`
+            : 'No stocks match your filters. Try a different preset or clear filters.'}
+        </div>
       </div>
     );
   }

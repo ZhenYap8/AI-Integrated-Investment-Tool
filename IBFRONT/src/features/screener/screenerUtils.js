@@ -112,7 +112,7 @@ export function filterItems(items, filters) {
     if (sector && row.sector !== sector) return false;
     if (preset && preset !== 'shortlist' && !matchesPreset(row, preset)) return false;
     if (q) {
-      const hay = `${row.ticker} ${row.companyName} ${row.sector || ''}`.toLowerCase();
+      const hay = `${row.ticker} ${row.companyName} ${row.sector || ''} ${row.industry || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (minMetrics > 0 && metricsAvailableCount(row) < minMetrics) return false;

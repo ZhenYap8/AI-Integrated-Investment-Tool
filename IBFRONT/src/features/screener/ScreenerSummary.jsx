@@ -41,31 +41,31 @@ export default function GradeDistribution({ distribution = [], activeGrade = '',
   );
 }
 
-export function ScreenerSummaryStrip({ summary, universeLabel, filteredCount, showAll, topN }) {
+export function ScreenerSummaryStrip({ summary, sectorLabel, filteredCount, showAll, topN }) {
   if (!summary) return null;
 
   return (
     <div className="screen-summary-strip">
       <div className="screen-summary-stat">
         <span className="screen-summary-value">{summary.total}</span>
-        <span className="screen-summary-label">Universe{universeLabel ? ` · ${universeLabel}` : ''}</span>
+        <span className="screen-summary-label">{sectorLabel || 'Sector'} · companies</span>
       </div>
       <div className="screen-summary-stat">
         <span className="screen-summary-value">{summary.aCount}</span>
-        <span className="screen-summary-label">A-grade ({summary.aPct}%)</span>
+        <span className="screen-summary-label">A-grade in sector ({summary.aPct}%)</span>
       </div>
       <div className="screen-summary-stat">
         <span className="screen-summary-value">{summary.median}</span>
-        <span className="screen-summary-label">Median score</span>
+        <span className="screen-summary-label">Sector median score</span>
       </div>
       <div className="screen-summary-stat">
         <span className="screen-summary-value">{summary.avg}</span>
-        <span className="screen-summary-label">Average score</span>
+        <span className="screen-summary-label">Sector average</span>
       </div>
       <div className="screen-summary-stat">
         <span className="screen-summary-value">{filteredCount}</span>
         <span className="screen-summary-label">
-          {showAll ? 'Matching filters' : `Top ${topN} shown`}
+          {showAll ? 'In this sector' : `Top ${topN} in sector`}
         </span>
       </div>
     </div>

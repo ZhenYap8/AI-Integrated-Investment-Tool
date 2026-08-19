@@ -1,12 +1,11 @@
 const GRADES = ['A', 'B', 'C', 'D', 'F', '—'];
 
 export const PRESETS = [
-  { id: '', label: 'All companies' },
-  { id: 'quality', label: 'Quality compounders', hint: 'Score ≥80, ROE & margin pass' },
-  { id: 'growth', label: 'Growth + quality', hint: 'Score ≥60, revenue CAGR pass' },
-  { id: 'safety', label: 'Balance sheet safety', hint: 'Low leverage & strong coverage' },
-  { id: 'turnaround', label: 'Turnaround watch', hint: 'Score 40–60, 2+ weak metrics' },
-  { id: 'shortlist', label: 'My shortlist', hint: 'Starred names only' },
+  { id: '', label: 'All in sector' },
+  { id: 'quality', label: 'Sector leaders', hint: 'Top quality within this sector (score ≥80)' },
+  { id: 'growth', label: 'Growth names', hint: 'Revenue growth pass in this sector' },
+  { id: 'safety', label: 'Defensive', hint: 'Strong balance sheet within sector' },
+  { id: 'shortlist', label: 'My shortlist', hint: 'All starred names across every sector' },
 ];
 
 export function metricPass(row, metricId) {
@@ -38,9 +37,40 @@ export function matchesPreset(row, presetId) {
 export function getSectors(items) {
   const sectors = new Set();
   for (const row of items) {
-    if (row.sector) sectors.add(row.sector);
+    if (row.sector && metricsAvailableCount(row) >= 3) sectors.add(row.sector);
   }
   return Array.from(sectors).sort();
+}
+
+export function getSectorCounts(items) {
+  const counts = {};
+  for (const row of items) {
+    if (!row.sector || metricsAvailableCount(row) < 3) continue;
+    counts[row.sector] = (counts[row.sector] || 0) + 1;
+  }
+  return counts;
+}
+
+export function pickDefaultSector(items) {
+  const counts = getSectorCounts(items);
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  return sorted[0]?.[0] || getSectors(items)[0] || '';
+}
+
+/** All shortlisted tickers from loaded universe, any sector */
+export function buildShortlistPool(items, shortlistTickers) {
+  const shortSet = new Set(shortlistTickers);
+  return items
+    .filter((row) => shortSet.has(row.ticker))
+    .sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
+}
+
+/** Rank and return stocks for one sector — peers compared only within sector */
+export function rankInSector(items, sector) {
+  const list = items
+    .filter((row) => row.sector === sector && metricsAvailableCount(row) >= 3)
+    .sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
+  return list.map((row, i) => ({ ...row, sectorRank: i + 1, sectorSize: list.length }));
 }
 
 export function computeGradeDistribution(items) {

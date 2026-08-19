@@ -6,6 +6,7 @@ scheduled feed, then caches interpretable stock scores for the dashboard.
 """
 from __future__ import annotations
 
+from collections import defaultdict
 import json
 import os
 import threading
@@ -26,7 +27,7 @@ UNIVERSE_PRESETS: Dict[str, Dict[str, Any]] = {
 
 CACHE_PATH = os.getenv("SCREEN_CACHE_PATH", "/tmp/market_screen_cache.json")
 CACHE_TTL_SECONDS = int(os.getenv("SCREEN_CACHE_TTL", str(12 * 3600)))
-MAX_TICKERS = int(os.getenv("SCREEN_MAX_TICKERS", "500"))
+MAX_TICKERS = int(os.getenv("SCREEN_MAX_TICKERS", "100"))
 DEFAULT_UNIVERSE = os.getenv("SCREEN_UNIVERSE", "sp500")
 FETCH_DELAY_SECONDS = float(os.getenv("SCREEN_FETCH_DELAY", "0.12"))
 
@@ -249,6 +250,15 @@ class MarketPipeline:
         ranked = sorted(scored_items, key=lambda x: x.get("compositeScore") or 0, reverse=True)
         for idx, item in enumerate(ranked, start=1):
             item["rank"] = idx
+
+        groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for item in ranked:
+            groups[item.get("sector") or "Unknown"].append(item)
+        for group in groups.values():
+            group.sort(key=lambda x: x.get("compositeScore") or 0, reverse=True)
+            for idx, item in enumerate(group, start=1):
+                item["sectorRank"] = idx
+                item["sectorSize"] = len(group)
 
         payload = {
             "status": "ready" if final else "running",

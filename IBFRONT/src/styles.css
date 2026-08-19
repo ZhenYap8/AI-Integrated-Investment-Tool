@@ -770,6 +770,57 @@ button {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+.sector-tabs-wrap {
+  margin-top: 16px;
+}
+.sector-tabs-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.sector-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sector-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sector-tab:hover { background: var(--row-hover); }
+.sector-tab.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.dark-mode .sector-tab.active { background: #1e3a5f; color: #93c5fd; }
+.sector-tab-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--row-hover);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sector-tab.active .sector-tab-count {
+  background: rgba(37, 99, 235, 0.15);
+  color: inherit;
+}
 .screen-settings-hint {
   margin: 12px 0 0;
   padding: 10px 12px;

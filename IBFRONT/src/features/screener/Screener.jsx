@@ -4,15 +4,19 @@ import Badge from '../../components/Badge.jsx';
 import { fetchJSON, api } from '../../lib/api.js';
 import ScreenerTable, { ScreenerDetail } from './ScreenerTable.jsx';
 import GradeDistribution, { ScreenerSummaryStrip } from './ScreenerSummary.jsx';
+import SectorTabs from './SectorTabs.jsx';
 import {
   PRESETS,
+  buildShortlistPool,
   computeGradeDistribution,
   computeSummary,
   filterItems,
+  getSectorCounts,
   getSectors,
   isLikelyAlphabeticalSample,
   loadShortlist,
-  metricsAvailableCount,
+  pickDefaultSector,
+  rankInSector,
   saveShortlist,
   toggleShortlist,
 } from './screenerUtils.js';
@@ -23,7 +27,7 @@ const UNIVERSE_OPTIONS = [
   { id: 'nasdaq', label: 'NASDAQ listed', defaultMax: 200 },
 ];
 
-const SIZE_CANDIDATES = [100, 200, 500];
+const SIZE_CANDIDATES = [50, 100, 200, 500];
 
 function sizeOptionsForUniverse(universeId) {
   const cap = UNIVERSE_OPTIONS.find((u) => u.id === universeId)?.defaultMax ?? 500;
@@ -35,9 +39,8 @@ function sizeOptionsForUniverse(universeId) {
   }));
 }
 
-const TOP_N = 25;
+const TOP_N = 10;
 const PAGE_SIZE = 50;
-const MIN_METRICS_FOR_RANK = 3;
 
 function formatUpdated(value) {
   if (!value) return 'Never';
@@ -55,7 +58,7 @@ export default function Screener() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [universe, setUniverse] = useState('sp500');
-  const [maxTickers, setMaxTickers] = useState('500');
+  const [maxTickers, setMaxTickers] = useState('100');
   const [selected, setSelected] = useState(null);
 
   const [showAll, setShowAll] = useState(false);
@@ -68,7 +71,7 @@ export default function Screener() {
   const configSynced = useRef(false);
 
   const loadedUniverse = status?.universe || 'sp500';
-  const loadedMaxTickers = String(status?.maxTickers ?? '500');
+  const loadedMaxTickers = String(status?.maxTickers ?? '100');
   const settingsDirty = Boolean(
     status?.status === 'ready'
     && (universe !== loadedUniverse || maxTickers !== loadedMaxTickers),
@@ -127,6 +130,14 @@ export default function Screener() {
     configSynced.current = true;
   }, [status]);
 
+  useEffect(() => {
+    if (!items.length) return;
+    const available = getSectors(items);
+    if (!sector || !available.includes(sector)) {
+      setSector(pickDefaultSector(items));
+    }
+  }, [items, sector]);
+
   const onUniverseChange = (nextUniverse) => {
     setUniverse(nextUniverse);
     const opt = UNIVERSE_OPTIONS.find((o) => o.id === nextUniverse);
@@ -143,36 +154,34 @@ export default function Screener() {
   }, [showAll, gradeFilter, search, sector, preset, items.length]);
 
   const sectors = useMemo(() => getSectors(items), [items]);
+  const sectorCounts = useMemo(() => getSectorCounts(items), [items]);
   const sizeOptions = useMemo(() => sizeOptionsForUniverse(universe), [universe]);
-  const gradeDistribution = useMemo(() => computeGradeDistribution(items), [items]);
-  const universeSummary = useMemo(() => computeSummary(items), [items]);
 
-  const filtered = useMemo(() => {
-    const searching = Boolean(search.trim());
-    const list = filterItems(items, {
-      search,
-      sector,
-      grade: gradeFilter,
-      preset,
-      shortlist,
-      minMetrics: searching ? 0 : MIN_METRICS_FOR_RANK,
-    });
-    list.sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
-    return list;
-  }, [items, search, sector, gradeFilter, preset, shortlist]);
+  const isShortlistView = preset === 'shortlist';
+
+  const viewPool = useMemo(() => {
+    if (isShortlistView) return buildShortlistPool(items, shortlist);
+    if (!sector) return [];
+    return rankInSector(items, sector);
+  }, [items, sector, isShortlistView, shortlist]);
+
+  const viewSummary = useMemo(() => computeSummary(viewPool), [viewPool]);
+  const gradeDistribution = useMemo(() => computeGradeDistribution(viewPool), [viewPool]);
+
+  const filtered = useMemo(() => filterItems(viewPool, {
+    search,
+    grade: gradeFilter,
+    preset: isShortlistView ? '' : preset,
+    shortlist: [],
+    minMetrics: 0,
+  }), [viewPool, search, gradeFilter, preset, isShortlistView]);
 
   const staleSample = useMemo(() => isLikelyAlphabeticalSample(items), [items]);
-  const hiddenLowData = useMemo(() => {
-    if (search.trim()) return 0;
-    return items.length - filterItems(items, {
-      search, sector, grade: gradeFilter, preset, shortlist, minMetrics: MIN_METRICS_FOR_RANK,
-    }).length;
-  }, [items, search, sector, gradeFilter, preset, shortlist]);
 
   const displayed = useMemo(() => {
-    if (search.trim() || showAll) return filtered;
+    if (isShortlistView || search.trim() || showAll) return filtered;
     return filtered.slice(0, TOP_N);
-  }, [filtered, showAll, search]);
+  }, [filtered, showAll, search, isShortlistView]);
 
   const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
 
@@ -220,9 +229,9 @@ export default function Screener() {
   const clearFilters = () => {
     setGradeFilter('');
     setSearch('');
-    setSector('');
     setPreset('');
     setShowAll(false);
+    if (items.length) setSector(pickDefaultSector(items));
   };
 
   const progressLabel = useMemo(() => {
@@ -234,7 +243,7 @@ export default function Screener() {
     return null;
   }, [status]);
 
-  const hasActiveFilters = gradeFilter || search || sector || preset || showAll;
+  const hasActiveFilters = gradeFilter || search || preset || showAll;
   const activePreset = PRESETS.find((p) => p.id === preset);
 
   return (
@@ -244,7 +253,7 @@ export default function Screener() {
           <div>
             <h1 className="title">Investment Screener</h1>
             <p className="lead">
-              Start with a focused shortlist, then drill into full analysis. Quality scores from Yahoo Finance fundamentals across S&amp;P 500 and NASDAQ indices.
+              Compare companies within the same sector — not across the whole market. Pick a sector, review the top names, then drill into full analysis.
             </p>
           </div>
           <div className="screen-hero-actions">
@@ -272,13 +281,29 @@ export default function Screener() {
           </span>
         </div>
 
-        {universeSummary && (
+        {sectors.length > 0 && !isShortlistView && (
+          <SectorTabs
+            sectors={sectors}
+            counts={sectorCounts}
+            active={sector}
+            onSelect={(next) => {
+              setSector(next);
+              setPreset('');
+            }}
+          />
+        )}
+
+        {isShortlistView && (
+          <p className="screen-preset-hint">Showing all shortlisted companies across sectors.</p>
+        )}
+
+        {viewSummary && (isShortlistView || sector) && (
           <>
             <ScreenerSummaryStrip
-              summary={universeSummary}
-              universeLabel={status?.universeLabel}
+              summary={viewSummary}
+              sectorLabel={isShortlistView ? 'Shortlist' : sector}
               filteredCount={filtered.length}
-              showAll={showAll}
+              showAll={showAll || isShortlistView}
               topN={TOP_N}
             />
             <GradeDistribution
@@ -306,22 +331,13 @@ export default function Screener() {
 
         <div className="screen-filters">
           <label className="screen-search-label">
-            Search
+            Search {isShortlistView ? 'shortlist' : `in ${sector || 'sector'}`}
             <input
               type="search"
               placeholder="Ticker or company…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-          </label>
-          <label>
-            Sector
-            <select value={sector} onChange={(e) => setSector(e.target.value)}>
-              <option value="">All sectors</option>
-              {sectors.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
           </label>
           <label>
             Universe
@@ -353,7 +369,7 @@ export default function Screener() {
 
         {status?.status === 'running' && !items.length && (
           <div className="screen-warning">
-            Scoring stocks for the first time — results will appear in batches. This can take a few minutes for 500 names.
+            Scoring stocks for the first time — results will appear in batches. Start with 100 stocks for faster loads.
           </div>
         )}
 
@@ -362,7 +378,7 @@ export default function Screener() {
         {staleSample && (
           <div className="screen-warning">
             This looks like an old alphabetical NASDAQ sample (mostly tickers starting with &quot;A&quot;).
-            Select <strong>S&amp;P 500</strong>, set max stocks to <strong>500</strong>, then click <strong>Apply settings</strong>.
+            Select <strong>S&amp;P 500</strong>, set max stocks to <strong>100</strong>, then click <strong>Apply settings</strong>.
           </div>
         )}
       </Card>
@@ -371,13 +387,18 @@ export default function Screener() {
         <Card className="screen-table-card">
           <div className="screen-table-header">
             <h3 className="section-title">
-              {search.trim()
-                ? `${displayed.length} result${displayed.length === 1 ? '' : 's'} for “${search.trim()}”`
-                : showAll
-                  ? `${displayed.length} of ${filtered.length} matches`
-                  : `Top ${Math.min(TOP_N, filtered.length)} quality leaders`}
-              {!search.trim() && !showAll && filtered.length > TOP_N ? ` · ${filtered.length} rankable` : ''}
-              {!search.trim() && hiddenLowData > 0 ? ` · ${hiddenLowData} hidden (insufficient data)` : ''}
+              {isShortlistView
+                ? `${displayed.length} shortlisted compan${displayed.length === 1 ? 'y' : 'ies'} across sectors`
+                : !sector
+                  ? 'Select a sector to compare peers'
+                  : search.trim()
+                    ? `${displayed.length} result${displayed.length === 1 ? '' : 's'} for “${search.trim()}” in ${sector}`
+                    : showAll
+                      ? `${displayed.length} of ${filtered.length} in ${sector}`
+                      : `Top ${Math.min(TOP_N, filtered.length)} in ${sector}`}
+              {!isShortlistView && sector && !search.trim() && !showAll && filtered.length > TOP_N
+                ? ` · ${filtered.length} rankable in sector`
+                : ''}
             </h3>
             <div className="screen-table-header-actions">
               {hasActiveFilters && (
@@ -385,13 +406,13 @@ export default function Screener() {
                   Clear filters
                 </button>
               )}
-              {filtered.length > TOP_N && (
+              {!isShortlistView && filtered.length > TOP_N && (
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => setShowAll((v) => !v)}
                 >
-                  {showAll ? `Show top ${TOP_N}` : `Show all (${filtered.length})`}
+                  {showAll ? `Show top ${TOP_N}` : `Show all in sector (${filtered.length})`}
                 </button>
               )}
             </div>
@@ -406,12 +427,14 @@ export default function Screener() {
             onToggleShortlist={onToggleShortlist}
             page={page}
             pageSize={PAGE_SIZE}
-            showPagination={Boolean(search.trim()) || (showAll && displayed.length > PAGE_SIZE)}
+            showPagination={Boolean(search.trim()) || (showAll && displayed.length > PAGE_SIZE) || (isShortlistView && displayed.length > PAGE_SIZE)}
             searchQuery={search.trim()}
-            universeSize={items.length}
+            sectorLabel={isShortlistView ? 'shortlist' : sector}
+            sectorSize={viewPool.length}
+            shortlistMode={isShortlistView}
           />
 
-          {showAll && displayed.length > PAGE_SIZE && (
+          {(showAll || isShortlistView) && displayed.length > PAGE_SIZE && (
             <div className="screen-pagination">
               <button
                 type="button"

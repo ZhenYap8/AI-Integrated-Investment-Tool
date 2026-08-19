@@ -22,7 +22,7 @@ services:
       - key: NEWS_API_KEY
         sync: false
       - key: SCREEN_MAX_TICKERS
-        value: "500"
+        value: "100"
       - key: SCREEN_UNIVERSE
         value: sp500
       - key: SCREEN_CACHE_TTL

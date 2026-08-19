@@ -46,7 +46,9 @@ export default function ScreenerTable({
   pageSize = 50,
   showPagination = false,
   searchQuery = '',
-  universeSize = 0,
+  sectorLabel = '',
+  sectorSize = 0,
+  shortlistMode = false,
 }) {
   const pageItems = showPagination
     ? items.slice((page - 1) * pageSize, page * pageSize)
@@ -65,8 +67,12 @@ export default function ScreenerTable({
       <div className="screen-table-wrap">
         <div className="screen-empty">
           {searchQuery
-            ? `No “${searchQuery}” in the current universe (${universeSize} stocks loaded). Try a different spelling, clear filters, or click Apply settings to load S&P 500.`
-            : 'No stocks match your filters. Try a different preset or clear filters.'}
+            ? `No “${searchQuery}” in ${sectorLabel || 'this list'}. Try a different spelling or clear filters.`
+            : shortlistMode
+              ? 'No shortlisted companies yet — star stocks from any sector to build your list.'
+              : sectorLabel
+                ? `No stocks match your filters in ${sectorLabel}. Try a different preset or clear filters.`
+                : 'Pick a sector above to compare companies within that group.'}
         </div>
       </div>
     );
@@ -78,7 +84,7 @@ export default function ScreenerTable({
         <thead>
           <tr>
             <th aria-label="Shortlist" />
-            <th>#</th>
+            <th># in sector</th>
             <th>Ticker</th>
             <th>Company</th>
             <th>Quality</th>
@@ -116,7 +122,7 @@ export default function ScreenerTable({
                     {starred ? '★' : '☆'}
                   </button>
                 </td>
-                <td>{row.rank ?? displayRank}</td>
+                <td>{row.sectorRank ?? displayRank}</td>
                 <td>
                   <button type="button" className="screen-ticker-btn" onClick={(e) => { e.stopPropagation(); onSelect?.(row); }}>
                     {row.ticker}
@@ -166,6 +172,9 @@ export function ScreenerDetail({ row, starred = false, onToggleShortlist }) {
           <h3>{row.ticker} · {row.companyName}</h3>
           <p className="screen-detail-sub">
             Quality score {row.compositeScore}/100 · Grade {row.grade}
+            {row.sectorRank != null && row.sector
+              ? ` · #${row.sectorRank} of ${row.sectorSize ?? '—'} in ${row.sector}`
+              : ''}
             {' · '}{row.greens}/{row.totalMetrics} metrics pass
             {row.metricsAvailable != null && row.metricsAvailable < 5
               ? ` · ${row.metricsAvailable}/5 data available`

@@ -557,7 +557,7 @@ button {
 @media (max-width: 768px) {
   .screen-hero { flex-direction: column; }
 }
-.screen-hero-actions { flex-shrink: 0; }
+.screen-hero-actions { flex-shrink: 0; display: flex; gap: 8px; flex-wrap: wrap; }
 .screen-status-row {
   display: flex;
   flex-wrap: wrap;
@@ -770,6 +770,15 @@ button {
   font-size: 0.82rem;
   color: var(--muted);
 }
+.screen-settings-hint {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.85rem;
+}
+.dark-mode .screen-settings-hint { background: #1e3a5f; color: #93c5fd; }
 
 .screen-search-label input {
   min-width: 200px;

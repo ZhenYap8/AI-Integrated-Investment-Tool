@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Card from '../../components/Card.jsx';
 import Badge from '../../components/Badge.jsx';
 import { fetchJSON, api } from '../../lib/api.js';
@@ -21,11 +21,17 @@ const UNIVERSE_OPTIONS = [
   { id: 'nasdaq', label: 'NASDAQ listed', defaultMax: 200 },
 ];
 
-const SIZE_OPTIONS = [
-  { label: '100 stocks', value: '100' },
-  { label: '200 stocks', value: '200' },
-  { label: '500 stocks', value: '500' },
-];
+const SIZE_CANDIDATES = [100, 200, 500];
+
+function sizeOptionsForUniverse(universeId) {
+  const cap = UNIVERSE_OPTIONS.find((u) => u.id === universeId)?.defaultMax ?? 500;
+  const sizes = SIZE_CANDIDATES.filter((s) => s <= cap);
+  if (!sizes.includes(cap)) sizes.push(cap);
+  return [...new Set(sizes)].sort((a, b) => a - b).map((s) => ({
+    label: s === cap && cap < 500 ? `All (${s})` : `${s} stocks`,
+    value: String(s),
+  }));
+}
 
 const TOP_N = 25;
 const PAGE_SIZE = 50;
@@ -56,6 +62,14 @@ export default function Screener() {
   const [preset, setPreset] = useState('');
   const [page, setPage] = useState(1);
   const [shortlist, setShortlist] = useState(() => loadShortlist());
+  const configSynced = useRef(false);
+
+  const loadedUniverse = status?.universe || 'sp500';
+  const loadedMaxTickers = String(status?.maxTickers ?? '500');
+  const settingsDirty = Boolean(
+    status?.status === 'ready'
+    && (universe !== loadedUniverse || maxTickers !== loadedMaxTickers),
+  );
 
   const loadStatus = useCallback(async () => {
     try {
@@ -103,16 +117,29 @@ export default function Screener() {
   }, [status?.status, pollWhileRunning]);
 
   useEffect(() => {
-    if (!status) return;
+    if (!status || configSynced.current) return;
     if (status.universe) setUniverse(status.universe);
-    if (status.maxTickers) setMaxTickers(String(status.maxTickers));
+    if (status.maxTickers != null) setMaxTickers(String(status.maxTickers));
+    configSynced.current = true;
   }, [status]);
+
+  const onUniverseChange = (nextUniverse) => {
+    setUniverse(nextUniverse);
+    const opt = UNIVERSE_OPTIONS.find((o) => o.id === nextUniverse);
+    if (opt) {
+      setMaxTickers((current) => {
+        const n = Number(current);
+        return String(Number.isFinite(n) ? Math.min(n, opt.defaultMax) : opt.defaultMax);
+      });
+    }
+  };
 
   useEffect(() => {
     setPage(1);
   }, [showAll, gradeFilter, search, sector, preset, items.length]);
 
   const sectors = useMemo(() => getSectors(items), [items]);
+  const sizeOptions = useMemo(() => sizeOptionsForUniverse(universe), [universe]);
   const gradeDistribution = useMemo(() => computeGradeDistribution(items), [items]);
   const universeSummary = useMemo(() => computeSummary(items), [items]);
 
@@ -157,11 +184,16 @@ export default function Screener() {
       });
       await fetchJSON(api(`/api/screen/refresh?${params.toString()}`), { method: 'POST' });
       await pollWhileRunning();
+      const latest = await loadStatus();
+      if (latest?.universe) setUniverse(latest.universe);
+      if (latest?.maxTickers != null) setMaxTickers(String(latest.maxTickers));
     } catch (err) {
       setError(err.message || 'Refresh failed');
       setRefreshing(false);
     }
   };
+
+  const onApplySettings = () => onRefresh();
 
   const onToggleShortlist = (ticker) => {
     setShortlist((prev) => {
@@ -193,7 +225,12 @@ export default function Screener() {
             </p>
           </div>
           <div className="screen-hero-actions">
-            <button type="button" className="btn-range" onClick={onRefresh} disabled={refreshing}>
+            {settingsDirty && (
+              <button type="button" className="btn-range" onClick={onApplySettings} disabled={refreshing}>
+                {refreshing ? 'Applying…' : 'Apply settings'}
+              </button>
+            )}
+            <button type="button" className="btn-secondary" onClick={onRefresh} disabled={refreshing}>
               {refreshing ? 'Updating…' : 'Update data'}
             </button>
           </div>
@@ -206,6 +243,7 @@ export default function Screener() {
           <span className="screen-status-text">
             Updated {formatUpdated(status?.updatedAt)}
             {status?.universeLabel ? ` · ${status.universeLabel}` : ''}
+            {status?.maxTickers ? ` · ${status.maxTickers} stocks` : ''}
             {shortlist.length ? ` · ${shortlist.length} shortlisted` : ''}
           </span>
         </div>
@@ -263,7 +301,7 @@ export default function Screener() {
           </label>
           <label>
             Universe
-            <select value={universe} onChange={(e) => setUniverse(e.target.value)}>
+            <select value={universe} onChange={(e) => onUniverseChange(e.target.value)}>
               {UNIVERSE_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>{opt.label}</option>
               ))}
@@ -272,12 +310,18 @@ export default function Screener() {
           <label>
             Max stocks
             <select value={maxTickers} onChange={(e) => setMaxTickers(e.target.value)}>
-              {SIZE_OPTIONS.map((opt) => (
-                <option key={opt.label} value={opt.value}>{opt.label}</option>
+              {sizeOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
           </label>
         </div>
+
+        {settingsDirty && (
+          <p className="screen-settings-hint">
+            Universe or max size changed — click <strong>Apply settings</strong> to rescore with the new list.
+          </p>
+        )}
 
         {activePreset?.hint && (
           <p className="screen-preset-hint">{activePreset.hint}</p>

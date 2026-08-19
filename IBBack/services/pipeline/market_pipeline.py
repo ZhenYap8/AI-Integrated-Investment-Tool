@@ -249,10 +249,12 @@ class MarketPipeline:
                 exchange_id=preset["exchange"],
                 max_count=max_tickers,
             )
+            print(f"[pipeline] resolved {universe} ({preset['index']}): {len(items)} symbols")
             if items:
                 return items
+            raise RuntimeError(f"Could not load index universe for {preset['index']}")
 
-        # Fallback: NASDAQ / NYSE symbol directory (alphabetical slice — less ideal)
+        # Explicit NASDAQ-listed mode only (not used for S&P 500 / NASDAQ 100 presets)
         return load_tickers(
             include_exchanges=[preset["exchange"]],
             max_count=max_tickers,

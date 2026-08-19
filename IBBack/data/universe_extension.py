@@ -377,35 +377,23 @@ def load_index_constituents(
     """Load index constituents (e.g. S&P 500, NASDAQ 100) with Yahoo-compatible symbols."""
     try:
         import pytickersymbols  # type: ignore
-    except Exception:
-        return []
+    except Exception as exc:
+        print(f"[universe] pytickersymbols unavailable: {exc}")
+        return _curated_index_fallback(index_name, exchange_id, max_count)
 
     pts = pytickersymbols.PyTickerSymbols()
     try:
         stocks = list(pts.get_stocks_by_index(index_name) or [])
-    except Exception:
-        return []
+    except Exception as exc:
+        print(f"[universe] index fetch failed for {index_name}: {exc}")
+        return _curated_index_fallback(index_name, exchange_id, max_count)
 
     out: List[Dict[str, str]] = []
     seen: set[str] = set()
 
     for stock in stocks:
         name = stock.get("name") or ""
-        yahoo = None
-        for sym in stock.get("symbols") or []:
-            candidate = sym.get("yahoo") or sym.get("symbol")
-            if not candidate:
-                continue
-            # Prefer plain US tickers without exchange suffix for indices
-            if "." not in candidate and "-" not in candidate:
-                yahoo = candidate.upper()
-                break
-        if not yahoo:
-            for sym in stock.get("symbols") or []:
-                candidate = sym.get("yahoo") or sym.get("symbol")
-                if candidate:
-                    yahoo = candidate.upper()
-                    break
+        yahoo = _pick_yahoo_symbol(stock)
         if not yahoo or yahoo in seen:
             continue
         seen.add(yahoo)
@@ -418,7 +406,76 @@ def load_index_constituents(
         if max_count and len(out) >= max_count:
             break
 
+    if not out:
+        print(f"[universe] no symbols parsed for {index_name}, using curated fallback")
+        return _curated_index_fallback(index_name, exchange_id, max_count)
     return out
+
+
+def _pick_yahoo_symbol(stock: dict) -> Optional[str]:
+    """Resolve a US Yahoo Finance ticker from a pytickersymbols stock record."""
+    primary = (stock.get("symbol") or "").strip().upper()
+    if primary and _is_plain_us_ticker(primary):
+        return primary
+
+    for entry in stock.get("symbols") or []:
+        candidate = (entry.get("yahoo") or entry.get("symbol") or "").strip().upper()
+        if not candidate:
+            continue
+        if entry.get("currency") == "USD" and _is_plain_us_ticker(candidate):
+            return candidate
+
+    for entry in stock.get("symbols") or []:
+        candidate = (entry.get("yahoo") or entry.get("symbol") or "").strip().upper()
+        if candidate and _is_plain_us_ticker(candidate):
+            return candidate
+    return None
+
+
+def _is_plain_us_ticker(symbol: str) -> bool:
+    return bool(symbol) and len(symbol) <= 6 and "." not in symbol and "-" not in symbol
+
+
+# Curated fallback when pytickersymbols is unavailable (e.g. local env without deps)
+CURATED_SP500 = [
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "UNH",
+    "XOM", "JPM", "JNJ", "V", "PG", "MA", "HD", "CVX", "MRK", "ABBV",
+    "PEP", "KO", "AVGO", "COST", "LLY", "WMT", "MCD", "CSCO", "TMO", "ACN",
+    "ABT", "DHR", "BAC", "CRM", "LIN", "AMD", "NFLX", "DIS", "WFC", "PM",
+    "TXN", "INTC", "QCOM", "UNP", "IBM", "GE", "CAT", "BA", "GS", "MS",
+    "RTX", "HON", "SPGI", "BLK", "AMAT", "DE", "LOW", "SBUX", "INTU", "ISRG",
+    "GILD", "MDLZ", "ADI", "VRTX", "REGN", "LRCX", "PANW", "KLAC", "SNPS", "CDNS",
+    "CRWD", "FTNT", "MELI", "ABNB", "PYPL", "ADBE", "ORLY", "MNST", "MAR", "ADSK",
+    "WDAY", "TEAM", "ZS", "BKNG", "MU", "CMCSA", "T", "PFE", "NEE", "UPS",
+    "COP", "ELV", "LMT", "TJX", "BMY", "SCHW", "CB", "MDT", "PLD", "SO",
+    "DUK", "ZTS", "CL", "MO", "CI", "USB", "PNC", "AON", "ITW", "EOG",
+]
+
+CURATED_NASDAQ100 = [
+    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "AVGO", "COST",
+    "NFLX", "AMD", "PEP", "CSCO", "INTC", "CMCSA", "QCOM", "TXN", "AMGN", "INTU",
+    "ISRG", "BKNG", "ADP", "GILD", "MU", "LRCX", "REGN", "PANW", "SNPS", "CDNS",
+    "KLAC", "MRVL", "CRWD", "FTNT", "ORLY", "MNST", "PCAR", "DXCM", "MELI", "ABNB",
+    "PYPL", "SBUX", "MDLZ", "MAR", "ADSK", "WDAY", "TEAM", "ZS", "ADBE", "PDD",
+]
+
+
+def _curated_index_fallback(
+    index_name: str,
+    exchange_id: str,
+    max_count: Optional[int],
+) -> List[Dict[str, str]]:
+    if "NASDAQ 100" in index_name.upper():
+        symbols = CURATED_NASDAQ100
+        ex = "US_NASDAQ"
+    else:
+        symbols = CURATED_SP500
+        ex = exchange_id
+    cap = max_count or len(symbols)
+    return [
+        {"label": sym, "value": sym, "exchange": ex, "type": "company"}
+        for sym in symbols[:cap]
+    ]
 
 
 def find_company(query: str, tickers: Optional[List[Dict[str, str]]] = None) -> Optional[Dict[str, str]]:

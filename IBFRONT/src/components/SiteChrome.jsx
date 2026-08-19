@@ -20,6 +20,7 @@ function usePageTitle(location) {
     const map = {
       "/": "Sudut Invest",
       "/analyze": "Analyse • Sudut Invest",
+      "/screen": "Screener • Sudut Invest",
       "/about": "About •  Sudut Invest",
       "/docs": "Docs • Sudut Invest",
       "/disclaimer": "Disclaimer • Sudut Invest",
@@ -70,6 +71,7 @@ export default function SiteChrome({ children }) {
             </div>
             <div className="navbar-right">
               <Nav to="/analyze">Analyse</Nav>
+              <Nav to="/screen">Screener</Nav>
               <Nav to="/docs">Docs</Nav>
               <Nav to="/about">About</Nav>
               <Nav to="/disclaimer">Disclaimer</Nav>

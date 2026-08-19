@@ -3,11 +3,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from routers.api2 import router
 from data.universe_extension import load_tickers, exchange_label
+from services.pipeline import get_pipeline
 
-app = FastAPI(title="Investment Agent Backend", version="0.3.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Warm ticker universe and kick off screening feed if cache is empty/stale
+    try:
+        load_tickers()
+    except Exception as exc:
+        print(f"[startup] ticker load warning: {exc}")
+    try:
+        get_pipeline().ensure_fresh()
+    except Exception as exc:
+        print(f"[startup] pipeline warning: {exc}")
+    yield
+
+
+app = FastAPI(title="Investment Agent Backend", version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,7 +47,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
-    return {"message": "Investment Agent Backend", "status": "running", "version": "0.3.0"}
+    return {"message": "Investment Agent Backend", "status": "running", "version": "0.4.0"}
 
 
 app.include_router(router)

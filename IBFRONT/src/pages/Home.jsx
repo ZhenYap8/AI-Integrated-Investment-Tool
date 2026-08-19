@@ -9,14 +9,16 @@ export default function Home() {
     <div className="stack-lg">
       <Card>
         <h1 className="title">AI-assisted investment analyser</h1>
-        <p className="lead">Search companies across US, European, and Asian exchanges — view fundamentals, scorecard, valuation, and AI-powered investment thesis.</p>
-        <div className="mt-3">
-          <Link to="/analyze" className="btn-range">Get started</Link>
+        <p className="lead">Search companies across US, European, and Asian exchanges — screen NASDAQ names by quality score, then drill into fundamentals, valuation, and AI-powered investment thesis.</p>
+        <div className="mt-3" style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Link to="/screen" className="btn-range">Screen stocks</Link>
+          <Link to="/analyze" className="btn-range btn-secondary">Analyse one company</Link>
         </div>
       </Card>
 
       <div className="kpis">
         <Feature title="Global coverage" text="US, LSE, TSX, ASX, HKEX, TSE and more — search by ticker or company name." />
+        <Feature title="Investment screener" text="Repeatable NASDAQ pipeline ranks stocks by interpretable quality scores for fast screening." />
         <Feature title="Actionable metrics" text="Growth, margins, leverage, interest coverage, and ROE with pass/fail scorecard." />
       </div>
 

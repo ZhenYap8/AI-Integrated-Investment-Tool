@@ -2,11 +2,12 @@ from typing import List, Dict, Optional
 from fastapi import APIRouter, Query, HTTPException
 import datetime as dt
 
-from models.schemas2 import SuggestItem, AnalyzeResponse, ProsConsResponse
+from models.schemas2 import SuggestItem, AnalyzeResponse, ProsConsResponse, ScreenResponse, ScreenStatusResponse
 from services.analyzer2 import analyze_company, analyze_industry, thresholds_from_params
 from services.proscons import analyze_proscons_ai_only
 from services.analysis.valuation_engine import ValuationEngine
 from services.analysis.base import BaseAnalyzer
+from services.pipeline import get_pipeline
 from data.universe_extension import (
     DEMO_INDUSTRIES,
     GLOBAL_TICKERS,
@@ -189,3 +190,37 @@ async def scorecard(request: Dict):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error building scorecard: {str(e)}")
+
+
+@router.get("/api/screen", response_model=ScreenResponse)
+async def screen_stocks(
+    exchange: Optional[str] = Query(None, description="Filter by exchange id, e.g. US_NASDAQ"),
+    min_score: Optional[float] = Query(None, ge=0, le=100),
+    sort: str = Query("score", pattern="^(score|ticker|grade)$"),
+    limit: int = Query(100, ge=1, le=500),
+):
+    pipeline = get_pipeline()
+    return pipeline.results(exchange=exchange, min_score=min_score, sort=sort, limit=limit)
+
+
+@router.get("/api/screen/status", response_model=ScreenStatusResponse)
+async def screen_status():
+    pipeline = get_pipeline()
+    data = pipeline.status()
+    return {
+        "status": data.get("status", "idle"),
+        "updatedAt": data.get("updatedAt"),
+        "startedAt": data.get("startedAt"),
+        "stale": data.get("stale", True),
+        "exchange": data.get("exchange"),
+        "years": data.get("years", 5),
+        "stats": data.get("stats") or {},
+        "error": data.get("error"),
+        "cacheTtlHours": data.get("cacheTtlHours", 12.0),
+    }
+
+
+@router.post("/api/screen/refresh")
+async def screen_refresh(force: bool = Query(False)):
+    pipeline = get_pipeline()
+    return pipeline.refresh_async(force=force)

@@ -66,3 +66,54 @@ class ProsConsResponse(BaseModel):
     fromAI: bool = False
     mode: str = "metrics"  # ai | news | metrics
     headlines: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ScoreBreakdownItem(BaseModel):
+    id: str
+    label: str
+    verdict: str
+    value: Optional[float] = None
+    threshold: Optional[float] = None
+    unit: Optional[str] = None
+    points: float
+    maxPoints: float = 20
+
+
+class ScreenStockItem(BaseModel):
+    rank: int
+    ticker: str
+    companyName: str
+    exchange: Optional[str] = None
+    exchangeLabel: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    compositeScore: float
+    grade: str
+    passRate: float
+    greens: int
+    totalMetrics: int
+    breakdown: List[ScoreBreakdownItem] = Field(default_factory=list)
+    scorecard: List[ScoreItem] = Field(default_factory=list)
+    metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ScreenResponse(BaseModel):
+    updatedAt: Optional[str] = None
+    status: str
+    stale: bool = False
+    exchange: Optional[str] = None
+    years: int = 5
+    count: int = 0
+    items: List[ScreenStockItem] = Field(default_factory=list)
+
+
+class ScreenStatusResponse(BaseModel):
+    status: str
+    updatedAt: Optional[str] = None
+    startedAt: Optional[str] = None
+    stale: bool = False
+    exchange: Optional[str] = None
+    years: int = 5
+    stats: Dict[str, Any] = Field(default_factory=dict)
+    error: Optional[str] = None
+    cacheTtlHours: float = 12.0

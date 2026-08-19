@@ -21,6 +21,10 @@ services:
         value: gpt-4.1
       - key: NEWS_API_KEY
         sync: false
+      - key: SCREEN_MAX_TICKERS
+        value: "50"
+      - key: SCREEN_CACHE_TTL
+        value: "43200"
 
   # React frontend (static)
   - type: web

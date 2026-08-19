@@ -101,9 +101,10 @@ export default function Screener() {
 
   const pollWhileRunning = useCallback(async () => {
     const data = await loadStatus();
+    await loadResults();
     if (data?.status === 'running') {
       setRefreshing(true);
-      window.setTimeout(pollWhileRunning, 4000);
+      window.setTimeout(pollWhileRunning, 3000);
       return;
     }
     setRefreshing(false);
@@ -224,6 +225,15 @@ export default function Screener() {
     setShowAll(false);
   };
 
+  const progressLabel = useMemo(() => {
+    const scored = status?.stats?.scored;
+    const total = status?.stats?.total;
+    if (status?.status === 'running' && total) {
+      return `Scoring ${scored ?? 0}/${total}…`;
+    }
+    return null;
+  }, [status]);
+
   const hasActiveFilters = gradeFilter || search || sector || preset || showAll;
   const activePreset = PRESETS.find((p) => p.id === preset);
 
@@ -257,6 +267,7 @@ export default function Screener() {
             Updated {formatUpdated(status?.updatedAt)}
             {status?.universeLabel ? ` · ${status.universeLabel}` : ''}
             {status?.maxTickers ? ` · ${status.maxTickers} stocks` : ''}
+            {progressLabel ? ` · ${progressLabel}` : ''}
             {shortlist.length ? ` · ${shortlist.length} shortlisted` : ''}
           </span>
         </div>
@@ -338,6 +349,12 @@ export default function Screener() {
 
         {activePreset?.hint && (
           <p className="screen-preset-hint">{activePreset.hint}</p>
+        )}
+
+        {status?.status === 'running' && !items.length && (
+          <div className="screen-warning">
+            Scoring stocks for the first time — results will appear in batches. This can take a few minutes for 500 names.
+          </div>
         )}
 
         {error && <div className="screen-error">{error}</div>}

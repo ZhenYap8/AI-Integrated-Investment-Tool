@@ -109,9 +109,13 @@ class MarketPipeline:
 
     def ensure_fresh(self) -> None:
         with self._lock:
+            running = self._state.get("status") == "running"
             needs_refresh = (
-                not self._state.get("items")
-                or (self._is_stale_unlocked() and self._state.get("status") != "running")
+                not running
+                and (
+                    not self._state.get("items")
+                    or self._is_stale_unlocked()
+                )
             )
         if needs_refresh:
             self.refresh_async()
@@ -160,10 +164,13 @@ class MarketPipeline:
             universe_entries = self._resolve_universe(universe, max_tickers)
             years = 5
             thresholds = ThresholdManager.DEFAULT_THRESHOLDS
+            with self._lock:
+                self._state["stats"] = {"total": len(universe_entries), "scored": 0, "errors": 0}
             scored_items: List[Dict[str, Any]] = []
             errors = 0
+            ticker_pool = load_tickers(max_count=10000)
 
-            for entry in universe_entries:
+            for i, entry in enumerate(universe_entries):
                 ticker = entry["value"]
                 try:
                     import yfinance as yf
@@ -172,7 +179,7 @@ class MarketPipeline:
                     info = getattr(t, "info", {}) or {}
                     metrics = self._analyzer._extract_all_metrics(t, years)
                     score = self._scorer.score(metrics, thresholds, years)
-                    match = find_company(ticker, load_tickers(max_count=10000))
+                    match = find_company(ticker, ticker_pool)
                     ex = entry.get("exchange") or (match.get("exchange") if match else preset["exchange"])
 
                     scored_items.append(
@@ -204,33 +211,19 @@ class MarketPipeline:
                 except Exception as exc:
                     errors += 1
                     print(f"[pipeline] {ticker}: {exc}")
+
+                if (i + 1) % 10 == 0 or (i + 1) == len(universe_entries):
+                    self._publish_partial(
+                        scored_items, universe_entries, universe, preset, max_tickers,
+                        years, thresholds, errors,
+                    )
                 time.sleep(FETCH_DELAY_SECONDS)
 
             scored_items.sort(key=lambda x: x.get("compositeScore") or 0, reverse=True)
-            for idx, item in enumerate(scored_items, start=1):
-                item["rank"] = idx
-
-            payload = {
-                "status": "ready",
-                "updatedAt": _now_iso(),
-                "startedAt": self._state.get("startedAt"),
-                "universe": universe,
-                "universeLabel": preset["label"],
-                "maxTickers": max_tickers,
-                "years": years,
-                "thresholds": thresholds,
-                "items": scored_items,
-                "stats": {
-                    "total": len(universe_entries),
-                    "scored": len(scored_items),
-                    "errors": errors,
-                },
-                "error": None,
-            }
-
-            with self._lock:
-                self._state = payload
-            self._save_cache(payload)
+            self._publish_partial(
+                scored_items, universe_entries, universe, preset, max_tickers,
+                years, thresholds, errors, final=True,
+            )
             return self.status()
         except Exception as exc:
             with self._lock:
@@ -239,6 +232,45 @@ class MarketPipeline:
             return self.status()
         finally:
             self._refresh_lock.release()
+
+    def _publish_partial(
+        self,
+        scored_items: List[Dict[str, Any]],
+        universe_entries: List[Dict[str, str]],
+        universe: str,
+        preset: Dict[str, Any],
+        max_tickers: int,
+        years: int,
+        thresholds: Dict[str, float],
+        errors: int,
+        *,
+        final: bool = False,
+    ) -> None:
+        ranked = sorted(scored_items, key=lambda x: x.get("compositeScore") or 0, reverse=True)
+        for idx, item in enumerate(ranked, start=1):
+            item["rank"] = idx
+
+        payload = {
+            "status": "ready" if final else "running",
+            "updatedAt": _now_iso() if final else self._state.get("updatedAt"),
+            "startedAt": self._state.get("startedAt"),
+            "universe": universe,
+            "universeLabel": preset["label"],
+            "maxTickers": max_tickers,
+            "years": years,
+            "thresholds": thresholds,
+            "items": ranked,
+            "stats": {
+                "total": len(universe_entries),
+                "scored": len(scored_items),
+                "errors": errors,
+            },
+            "error": None,
+        }
+        with self._lock:
+            self._state.update(payload)
+        if final:
+            self._save_cache(payload)
 
     def _resolve_universe(self, universe: str, max_tickers: int) -> List[Dict[str, str]]:
         preset = UNIVERSE_PRESETS.get(universe, UNIVERSE_PRESETS["sp500"])

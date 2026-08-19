@@ -1,4 +1,4 @@
-const GRADES = ['A', 'B', 'C', 'D', 'F'];
+const GRADES = ['A', 'B', 'C', 'D', 'F', '—'];
 
 export const PRESETS = [
   { id: '', label: 'All companies' },

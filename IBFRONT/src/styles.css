@@ -810,6 +810,10 @@ button {
   background: #ef4444;
 }
 .pass-dot.pass { background: #22c55e; }
+.pass-dot.missing { background: #d1d5db; }
+.dark-mode .pass-dot.missing { background: #4b5563; }
+
+.screen-breakdown-fill-warn { background: #d1d5db; }
 
 .screen-star {
   border: none;

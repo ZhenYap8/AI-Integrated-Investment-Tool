@@ -2,7 +2,7 @@
 Interpretable stock scoring from financial metrics.
 
 Each of five fundamentals contributes up to 20 points (100 total).
-Partial credit is awarded when a metric is close to its threshold.
+Missing metrics count as 0 — prevents partial-data stocks from scoring 100/A.
 """
 from __future__ import annotations
 
@@ -11,13 +11,25 @@ from typing import Any, Dict, List, Optional
 from services.scorecard_service import ScorecardService
 
 METRIC_WEIGHT = 20
+EXPECTED_METRICS = 5
+MIN_METRICS_FOR_GRADE = 3
+
+METRIC_SPECS = [
+    ("rev_cagr", "revenue_cagr", "Revenue CAGR"),
+    ("op_margin", "operating_margin", "Operating Margin"),
+    ("nd_eq", "net_debt_to_equity", "Net Debt / Equity"),
+    ("interest_cover", "interest_coverage", "Interest Coverage"),
+    ("roe", "roe", "Return on Equity (ROE)"),
+]
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, value))
 
 
-def _grade(score: float) -> str:
+def _grade(score: float, metrics_available: int) -> str:
+    if metrics_available < MIN_METRICS_FOR_GRADE:
+        return "—"
     if score >= 80:
         return "A"
     if score >= 60:
@@ -82,53 +94,55 @@ class StockScorer:
     ) -> Dict[str, Any]:
         thresholds = {**self.scorecard_service.default_thresholds, **(overrides or {})}
         scorecard = self.scorecard_service.build_scorecard(metrics, overrides, years)
+        scorecard_by_id = {item["id"]: item for item in scorecard}
 
         breakdown: List[Dict[str, Any]] = []
         total_points = 0.0
-        max_points = 0.0
+        metrics_available = 0
+        greens = 0
 
-        for item in scorecard:
-            metric_id = item["id"]
-            raw_value = metrics.get(self._metrics_key(metric_id))
+        for metric_id, metrics_key, fallback_label in METRIC_SPECS:
+            raw_value = metrics.get(metrics_key)
+            item = scorecard_by_id.get(metric_id)
             points = _metric_points(metric_id, raw_value, thresholds)
             total_points += points
-            max_points += METRIC_WEIGHT
+
+            if raw_value is not None:
+                metrics_available += 1
+                verdict = item["verdict"] if item else ("green" if points >= METRIC_WEIGHT else "red")
+                if verdict == "green":
+                    greens += 1
+            else:
+                verdict = "missing"
+
             breakdown.append(
                 {
                     "id": metric_id,
-                    "label": item["label"],
-                    "verdict": item["verdict"],
-                    "value": item.get("value"),
-                    "threshold": item.get("threshold"),
-                    "unit": item.get("unit"),
+                    "label": item["label"] if item else fallback_label,
+                    "verdict": verdict,
+                    "value": item.get("value") if item else None,
+                    "threshold": item.get("threshold") if item else None,
+                    "unit": item.get("unit") if item else None,
                     "points": round(points, 1),
                     "maxPoints": METRIC_WEIGHT,
                 }
             )
 
-        greens = sum(1 for s in scorecard if s["verdict"] == "green")
-        total = len(scorecard)
-        composite = round((total_points / max_points) * 100, 1) if max_points else 0.0
+        max_points = EXPECTED_METRICS * METRIC_WEIGHT
+        composite = round((total_points / max_points) * 100, 1)
+        coverage = round((metrics_available / EXPECTED_METRICS) * 100, 1)
 
         return {
             "compositeScore": composite,
-            "grade": _grade(composite),
-            "passRate": round((greens / total) * 100, 1) if total else 0.0,
+            "grade": _grade(composite, metrics_available),
+            "passRate": round((greens / EXPECTED_METRICS) * 100, 1),
             "greens": greens,
-            "totalMetrics": total,
+            "totalMetrics": EXPECTED_METRICS,
+            "metricsAvailable": metrics_available,
+            "dataCoverage": coverage,
             "breakdown": breakdown,
             "scorecard": scorecard,
         }
-
-    @staticmethod
-    def _metrics_key(scorecard_id: str) -> str:
-        return {
-            "rev_cagr": "revenue_cagr",
-            "op_margin": "operating_margin",
-            "nd_eq": "net_debt_to_equity",
-            "interest_cover": "interest_coverage",
-            "roe": "roe",
-        }.get(scorecard_id, scorecard_id)
 
 
 def score_stock(metrics: Dict[str, Any], overrides: Optional[Dict[str, float]] = None, years: int = 5) -> Dict[str, Any]:

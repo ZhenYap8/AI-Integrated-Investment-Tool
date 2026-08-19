@@ -188,6 +188,8 @@ class MarketPipeline:
                             "passRate": score["passRate"],
                             "greens": score["greens"],
                             "totalMetrics": score["totalMetrics"],
+                            "metricsAvailable": score.get("metricsAvailable"),
+                            "dataCoverage": score.get("dataCoverage"),
                             "breakdown": score["breakdown"],
                             "scorecard": score["scorecard"],
                             "metrics": {

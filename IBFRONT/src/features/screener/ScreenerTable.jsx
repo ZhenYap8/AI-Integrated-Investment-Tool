@@ -6,6 +6,7 @@ function gradeTone(grade) {
   if (grade === 'A') return 'green';
   if (grade === 'B') return 'green';
   if (grade === 'C') return 'amber';
+  if (grade === '—' || grade === 'ND') return 'gray';
   return 'red';
 }
 
@@ -21,14 +22,14 @@ function fmtPct(value) {
 }
 
 function PassDots({ breakdown = [] }) {
-  const dots = breakdown.length
+  const dots = breakdown.length >= 5
     ? breakdown
-    : [{ verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }];
+    : [...breakdown, ...Array(Math.max(0, 5 - breakdown.length)).fill({ verdict: 'missing' })];
 
   return (
-    <span className="pass-dots" title={`${dots.filter((d) => d.verdict === 'green').length}/${dots.length} metrics pass`}>
-      {dots.map((d, i) => (
-        <span key={i} className={`pass-dot ${d.verdict === 'green' ? 'pass' : 'fail'}`} />
+    <span className="pass-dots" title={`${dots.filter((d) => d.verdict === 'green').length}/5 metrics pass`}>
+      {dots.slice(0, 5).map((d, i) => (
+        <span key={i} className={`pass-dot ${d.verdict === 'green' ? 'pass' : d.verdict === 'missing' ? 'missing' : 'fail'}`} />
       ))}
     </span>
   );
@@ -158,7 +159,11 @@ export function ScreenerDetail({ row, starred = false, onToggleShortlist }) {
         <div>
           <h3>{row.ticker} · {row.companyName}</h3>
           <p className="screen-detail-sub">
-            Quality score {row.compositeScore}/100 · Grade {row.grade} · {row.greens}/{row.totalMetrics} metrics pass
+            Quality score {row.compositeScore}/100 · Grade {row.grade}
+            {' · '}{row.greens}/{row.totalMetrics} metrics pass
+            {row.metricsAvailable != null && row.metricsAvailable < 5
+              ? ` · ${row.metricsAvailable}/5 data available`
+              : ''}
           </p>
         </div>
         <div className="screen-detail-actions">
@@ -176,21 +181,34 @@ export function ScreenerDetail({ row, starred = false, onToggleShortlist }) {
       </div>
       <div className="screen-breakdown">
         {(row.breakdown || []).map((item) => (
-          <div key={item.id} className={`screen-breakdown-item score-${item.verdict === 'green' ? 'pass' : 'fail'}`}>
+          <div
+            key={item.id}
+            className={`screen-breakdown-item score-${
+              item.verdict === 'green' ? 'pass' : item.verdict === 'missing' ? 'warn' : 'fail'
+            }`}
+          >
             <div className="screen-breakdown-top">
-              <span>{item.label}</span>
+              <span>{item.label}{item.verdict === 'missing' ? ' (no data)' : ''}</span>
               <span>{item.points}/{item.maxPoints} pts</span>
             </div>
             <div className="screen-breakdown-bar">
               <div
-                className={`screen-breakdown-fill screen-breakdown-fill-${item.verdict === 'green' ? 'pass' : 'fail'}`}
+                className={`screen-breakdown-fill screen-breakdown-fill-${
+                  item.verdict === 'green' ? 'pass' : item.verdict === 'missing' ? 'warn' : 'fail'
+                }`}
                 style={{ width: `${Math.min(100, (item.points / item.maxPoints) * 100)}%` }}
               />
             </div>
             <div className="score-detail">
-              {item.value != null ? `${item.value}${item.unit === '%' ? '%' : item.unit || ''}` : '—'}
-              {' vs '}
-              {item.threshold != null ? `${item.threshold}${item.unit === '%' ? '%' : item.unit || ''}` : '—'}
+              {item.verdict === 'missing'
+                ? 'Insufficient Yahoo Finance data for this metric'
+                : (
+                  <>
+                    {item.value != null ? `${item.value}${item.unit === '%' ? '%' : item.unit || ''}` : '—'}
+                    {' vs '}
+                    {item.threshold != null ? `${item.threshold}${item.unit === '%' ? '%' : item.unit || ''}` : '—'}
+                  </>
+                )}
             </div>
           </div>
         ))}

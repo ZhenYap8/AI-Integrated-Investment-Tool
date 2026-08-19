@@ -10,6 +10,18 @@ const MIN_SCORE_OPTIONS = [
   { label: '80+ (A only)', value: '80' },
 ];
 
+const UNIVERSE_OPTIONS = [
+  { id: 'sp500', label: 'S&P 500', defaultMax: 500 },
+  { id: 'nasdaq100', label: 'NASDAQ 100', defaultMax: 101 },
+  { id: 'nasdaq', label: 'NASDAQ listed', defaultMax: 200 },
+];
+
+const SIZE_OPTIONS = [
+  { label: '100 stocks', value: '100' },
+  { label: '200 stocks', value: '200' },
+  { label: '500 stocks', value: '500' },
+];
+
 function formatUpdated(value) {
   if (!value) return 'Never';
   try {
@@ -27,6 +39,8 @@ export default function Screener() {
   const [error, setError] = useState('');
   const [minScore, setMinScore] = useState('');
   const [sort, setSort] = useState('score');
+  const [universe, setUniverse] = useState('sp500');
+  const [maxTickers, setMaxTickers] = useState('500');
   const [selected, setSelected] = useState(null);
 
   const loadStatus = useCallback(async () => {
@@ -44,7 +58,7 @@ export default function Screener() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ sort, limit: '100' });
+      const params = new URLSearchParams({ sort, limit: '500' });
       if (minScore) params.set('min_score', minScore);
       const data = await fetchJSON(api(`/api/screen?${params.toString()}`));
       setItems(data.items || []);
@@ -82,11 +96,22 @@ export default function Screener() {
     }
   }, [status?.status, pollWhileRunning]);
 
+  useEffect(() => {
+    if (!status) return;
+    if (status.universe) setUniverse(status.universe);
+    if (status.maxTickers) setMaxTickers(String(status.maxTickers));
+  }, [status]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     setError('');
     try {
-      await fetchJSON(api('/api/screen/refresh?force=true'), { method: 'POST' });
+      const params = new URLSearchParams({
+        force: 'true',
+        universe,
+        max_tickers: maxTickers,
+      });
+      await fetchJSON(api(`/api/screen/refresh?${params.toString()}`), { method: 'POST' });
       await pollWhileRunning();
     } catch (err) {
       setError(err.message || 'Refresh failed');
@@ -108,7 +133,7 @@ export default function Screener() {
           <div>
             <h1 className="title">Investment Screener</h1>
             <p className="lead">
-              Repeatable NASDAQ fundamentals feed from Yahoo Finance — ranked by interpretable quality scores for growth, margins, leverage, and returns.
+              Repeatable fundamentals feed from Yahoo Finance — screen S&amp;P 500, NASDAQ 100, or broader NASDAQ lists with interpretable quality scores.
             </p>
           </div>
           <div className="screen-hero-actions">
@@ -124,6 +149,8 @@ export default function Screener() {
           </Badge>
           <span className="screen-status-text">
             Last updated {formatUpdated(status?.updatedAt)}
+            {status?.universeLabel ? ` · ${status.universeLabel}` : ''}
+            {status?.stats?.scored ? ` · ${status.stats.scored} companies scored` : ''}
             {status?.stale ? ' · cache stale, refresh queued' : ''}
           </span>
           {summary && (
@@ -134,6 +161,22 @@ export default function Screener() {
         </div>
 
         <div className="screen-filters">
+          <label>
+            Universe
+            <select value={universe} onChange={(e) => setUniverse(e.target.value)}>
+              {UNIVERSE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Max stocks
+            <select value={maxTickers} onChange={(e) => setMaxTickers(e.target.value)}>
+              {SIZE_OPTIONS.map((opt) => (
+                <option key={opt.label} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
           <label>
             Min score
             <select value={minScore} onChange={(e) => setMinScore(e.target.value)}>
@@ -156,7 +199,7 @@ export default function Screener() {
 
       <div className="screen-layout">
         <Card className="screen-table-card">
-          <h3 className="section-title">Ranked universe</h3>
+          <h3 className="section-title">Ranked universe ({items.length} shown)</h3>
           <ScreenerTable items={items} loading={loading || refreshing} selected={selected} onSelect={setSelected} />
         </Card>
         <Card className="screen-detail-card">
@@ -172,7 +215,7 @@ export default function Screener() {
           revenue CAGR, operating margin, net debt/equity, interest coverage, and ROE. Full credit is awarded at the default threshold; partial credit applies when a metric is close. Grades: A ≥80, B ≥60, C ≥40, D ≥20.
         </p>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          The pipeline refreshes automatically every 12 hours and on deploy. Use Refresh pipeline to force a new run.
+          The pipeline refreshes automatically every 12 hours. Choose a universe and max size, then click Refresh pipeline — S&amp;P 500 at 500 stocks takes roughly 1–2 minutes.
         </p>
       </Card>
     </div>

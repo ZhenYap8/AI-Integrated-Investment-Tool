@@ -101,7 +101,9 @@ class ScreenResponse(BaseModel):
     updatedAt: Optional[str] = None
     status: str
     stale: bool = False
-    exchange: Optional[str] = None
+    universe: Optional[str] = None
+    universeLabel: Optional[str] = None
+    maxTickers: Optional[int] = None
     years: int = 5
     count: int = 0
     items: List[ScreenStockItem] = Field(default_factory=list)
@@ -112,8 +114,11 @@ class ScreenStatusResponse(BaseModel):
     updatedAt: Optional[str] = None
     startedAt: Optional[str] = None
     stale: bool = False
-    exchange: Optional[str] = None
+    universe: Optional[str] = None
+    universeLabel: Optional[str] = None
+    maxTickers: Optional[int] = None
     years: int = 5
     stats: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None
     cacheTtlHours: float = 12.0
+    availableUniverses: List[Dict[str, Any]] = Field(default_factory=list)

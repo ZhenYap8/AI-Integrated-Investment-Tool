@@ -212,15 +212,22 @@ async def screen_status():
         "updatedAt": data.get("updatedAt"),
         "startedAt": data.get("startedAt"),
         "stale": data.get("stale", True),
-        "exchange": data.get("exchange"),
+        "universe": data.get("universe"),
+        "universeLabel": data.get("universeLabel"),
+        "maxTickers": data.get("maxTickers"),
         "years": data.get("years", 5),
         "stats": data.get("stats") or {},
         "error": data.get("error"),
         "cacheTtlHours": data.get("cacheTtlHours", 12.0),
+        "availableUniverses": data.get("availableUniverses") or [],
     }
 
 
 @router.post("/api/screen/refresh")
-async def screen_refresh(force: bool = Query(False)):
+async def screen_refresh(
+    force: bool = Query(False),
+    max_tickers: Optional[int] = Query(None, ge=10, le=500),
+    universe: Optional[str] = Query(None, pattern="^(sp500|nasdaq100|nasdaq)$"),
+):
     pipeline = get_pipeline()
-    return pipeline.refresh_async(force=force)
+    return pipeline.refresh_async(force=force, max_tickers=max_tickers, universe=universe)

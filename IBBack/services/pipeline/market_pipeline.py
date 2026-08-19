@@ -1,8 +1,8 @@
 """
 Repeatable market screening pipeline.
 
-Loads the NASDAQ / Yahoo Finance universe, computes fundamentals on a
-scheduled feed, and caches interpretable stock scores for the dashboard.
+Loads index universes (S&P 500, NASDAQ 100) and Yahoo Finance fundamentals on a
+scheduled feed, then caches interpretable stock scores for the dashboard.
 """
 from __future__ import annotations
 
@@ -13,24 +13,22 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from data.universe_extension import exchange_label, find_company, load_tickers
+from data.universe_extension import exchange_label, find_company, load_index_constituents, load_tickers
 from services.analysis.company import CompanyAnalyzer
 from services.analysis.thresholds import ThresholdManager
 from services.pipeline.stock_scorer import StockScorer
 
-# Liquid NASDAQ names — reliable Yahoo Finance coverage on free tier
-DEFAULT_SCREEN_TICKERS = [
-    "AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "NVDA", "META", "TSLA", "AVGO", "COST",
-    "NFLX", "AMD", "ADBE", "PEP", "CSCO", "INTC", "CMCSA", "QCOM", "TXN", "AMGN",
-    "INTU", "ISRG", "BKNG", "VRTX", "ADP", "GILD", "MU", "LRCX", "REGN", "PANW",
-    "SNPS", "CDNS", "KLAC", "MRVL", "CRWD", "FTNT", "ORLY", "MNST", "PCAR", "DXCM",
-    "MELI", "ABNB", "PYPL", "SBUX", "MDLZ", "MAR", "ADSK", "WDAY", "TEAM", "ZS",
-]
+UNIVERSE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "sp500": {"label": "S&P 500", "index": "S&P 500", "exchange": "US_OTHER", "defaultMax": 500},
+    "nasdaq100": {"label": "NASDAQ 100", "index": "NASDAQ 100", "exchange": "US_NASDAQ", "defaultMax": 101},
+    "nasdaq": {"label": "NASDAQ listed", "index": None, "exchange": "US_NASDAQ", "defaultMax": 200},
+}
 
 CACHE_PATH = os.getenv("SCREEN_CACHE_PATH", "/tmp/market_screen_cache.json")
 CACHE_TTL_SECONDS = int(os.getenv("SCREEN_CACHE_TTL", str(12 * 3600)))
-MAX_TICKERS = int(os.getenv("SCREEN_MAX_TICKERS", "50"))
-FETCH_DELAY_SECONDS = float(os.getenv("SCREEN_FETCH_DELAY", "0.15"))
+MAX_TICKERS = int(os.getenv("SCREEN_MAX_TICKERS", "500"))
+DEFAULT_UNIVERSE = os.getenv("SCREEN_UNIVERSE", "sp500")
+FETCH_DELAY_SECONDS = float(os.getenv("SCREEN_FETCH_DELAY", "0.12"))
 
 
 class MarketPipeline:
@@ -39,11 +37,14 @@ class MarketPipeline:
         self._refresh_lock = threading.Lock()
         self._analyzer = CompanyAnalyzer()
         self._scorer = StockScorer()
+        self._run_config = {"universe": DEFAULT_UNIVERSE, "maxTickers": MAX_TICKERS}
         self._state: Dict[str, Any] = {
             "status": "idle",
             "updatedAt": None,
             "startedAt": None,
-            "exchange": "US_NASDAQ",
+            "universe": DEFAULT_UNIVERSE,
+            "universeLabel": UNIVERSE_PRESETS.get(DEFAULT_UNIVERSE, {}).get("label", DEFAULT_UNIVERSE),
+            "maxTickers": MAX_TICKERS,
             "years": 5,
             "thresholds": ThresholdManager.DEFAULT_THRESHOLDS,
             "items": [],
@@ -60,6 +61,10 @@ class MarketPipeline:
                 "stale": stale,
                 "cachePath": CACHE_PATH,
                 "cacheTtlHours": round(CACHE_TTL_SECONDS / 3600, 1),
+                "availableUniverses": [
+                    {"id": k, "label": v["label"], "defaultMax": v["defaultMax"]}
+                    for k, v in UNIVERSE_PRESETS.items()
+                ],
             }
 
     def results(
@@ -68,7 +73,7 @@ class MarketPipeline:
         exchange: Optional[str] = None,
         min_score: Optional[float] = None,
         sort: str = "score",
-        limit: int = 100,
+        limit: int = 500,
     ) -> Dict[str, Any]:
         self.ensure_fresh()
         with self._lock:
@@ -85,20 +90,19 @@ class MarketPipeline:
         if min_score is not None:
             items = [it for it in items if (it.get("compositeScore") or 0) >= min_score]
 
-        reverse = sort != "ticker"
         if sort == "ticker":
             items.sort(key=lambda x: (x.get("ticker") or ""))
-        elif sort == "grade":
-            items.sort(key=lambda x: (x.get("compositeScore") or 0), reverse=True)
         else:
-            items.sort(key=lambda x: (x.get("compositeScore") or 0), reverse=reverse)
+            items.sort(key=lambda x: (x.get("compositeScore") or 0), reverse=True)
 
         return {
             "updatedAt": self._state.get("updatedAt"),
             "status": self._state.get("status"),
             "stale": self._is_stale(),
-            "exchange": self._state.get("exchange"),
-            "years": self._state.get("years"),
+            "universe": self._state.get("universe"),
+            "universeLabel": self._state.get("universeLabel"),
+            "maxTickers": self._state.get("maxTickers"),
+            "years": self._state.get("years", 5),
             "count": len(items[:limit]),
             "items": items[:limit],
         }
@@ -112,7 +116,18 @@ class MarketPipeline:
         if needs_refresh:
             self.refresh_async()
 
-    def refresh_async(self, force: bool = False) -> Dict[str, Any]:
+    def refresh_async(
+        self,
+        force: bool = False,
+        *,
+        max_tickers: Optional[int] = None,
+        universe: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if max_tickers is not None:
+            self._run_config["maxTickers"] = min(max(max_tickers, 10), 500)
+        if universe is not None and universe in UNIVERSE_PRESETS:
+            self._run_config["universe"] = universe
+
         if not force and self._state.get("status") == "running":
             return self.status()
 
@@ -127,6 +142,10 @@ class MarketPipeline:
         if not self._refresh_lock.acquire(blocking=False):
             return self.status()
 
+        max_tickers = self._run_config.get("maxTickers", MAX_TICKERS)
+        universe = self._run_config.get("universe", DEFAULT_UNIVERSE)
+        preset = UNIVERSE_PRESETS.get(universe, UNIVERSE_PRESETS["sp500"])
+
         try:
             with self._lock:
                 if not force and self._state.get("status") == "running":
@@ -134,14 +153,17 @@ class MarketPipeline:
                 self._state["status"] = "running"
                 self._state["startedAt"] = _now_iso()
                 self._state["error"] = None
+                self._state["universe"] = universe
+                self._state["universeLabel"] = preset["label"]
+                self._state["maxTickers"] = max_tickers
 
-            universe = self._resolve_universe()
+            universe_entries = self._resolve_universe(universe, max_tickers)
             years = 5
             thresholds = ThresholdManager.DEFAULT_THRESHOLDS
             scored_items: List[Dict[str, Any]] = []
             errors = 0
 
-            for entry in universe:
+            for entry in universe_entries:
                 ticker = entry["value"]
                 try:
                     import yfinance as yf
@@ -151,7 +173,7 @@ class MarketPipeline:
                     metrics = self._analyzer._extract_all_metrics(t, years)
                     score = self._scorer.score(metrics, thresholds, years)
                     match = find_company(ticker, load_tickers(max_count=10000))
-                    ex = entry.get("exchange") or (match.get("exchange") if match else "US_NASDAQ")
+                    ex = entry.get("exchange") or (match.get("exchange") if match else preset["exchange"])
 
                     scored_items.append(
                         {
@@ -190,12 +212,14 @@ class MarketPipeline:
                 "status": "ready",
                 "updatedAt": _now_iso(),
                 "startedAt": self._state.get("startedAt"),
-                "exchange": "US_NASDAQ",
+                "universe": universe,
+                "universeLabel": preset["label"],
+                "maxTickers": max_tickers,
                 "years": years,
                 "thresholds": thresholds,
                 "items": scored_items,
                 "stats": {
-                    "total": len(universe),
+                    "total": len(universe_entries),
                     "scored": len(scored_items),
                     "errors": errors,
                 },
@@ -214,29 +238,23 @@ class MarketPipeline:
         finally:
             self._refresh_lock.release()
 
-    def _resolve_universe(self) -> List[Dict[str, str]]:
-        nasdaq = load_tickers(include_exchanges=["US_NASDAQ"], max_count=MAX_TICKERS * 3)
-        if nasdaq:
-            # Prefer well-known liquid names when present in NASDAQ feed
-            by_symbol = {t["value"].upper(): t for t in nasdaq}
-            ordered: List[Dict[str, str]] = []
-            for sym in DEFAULT_SCREEN_TICKERS:
-                if sym in by_symbol:
-                    ordered.append(by_symbol[sym])
-                if len(ordered) >= MAX_TICKERS:
-                    break
-            if len(ordered) < MAX_TICKERS:
-                for t in nasdaq:
-                    if t["value"].upper() not in {x["value"].upper() for x in ordered}:
-                        ordered.append(t)
-                    if len(ordered) >= MAX_TICKERS:
-                        break
-            return ordered[:MAX_TICKERS]
+    def _resolve_universe(self, universe: str, max_tickers: int) -> List[Dict[str, str]]:
+        preset = UNIVERSE_PRESETS.get(universe, UNIVERSE_PRESETS["sp500"])
 
-        return [
-            {"label": sym, "value": sym, "exchange": "US_NASDAQ", "type": "company"}
-            for sym in DEFAULT_SCREEN_TICKERS[:MAX_TICKERS]
-        ]
+        if preset.get("index"):
+            items = load_index_constituents(
+                preset["index"],
+                exchange_id=preset["exchange"],
+                max_count=max_tickers,
+            )
+            if items:
+                return items
+
+        # Fallback: NASDAQ / NYSE symbol directory (alphabetical slice — less ideal)
+        return load_tickers(
+            include_exchanges=[preset["exchange"]],
+            max_count=max_tickers,
+        )
 
     def _is_stale(self) -> bool:
         with self._lock:

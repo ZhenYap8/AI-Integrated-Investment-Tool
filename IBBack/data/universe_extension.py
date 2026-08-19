@@ -369,6 +369,58 @@ def load_us_tickers() -> List[Dict[str, str]]:
     return load_tickers(include_exchanges=["US_NASDAQ", "US_OTHER"])
 
 
+def load_index_constituents(
+    index_name: str,
+    exchange_id: str = "US_OTHER",
+    max_count: Optional[int] = None,
+) -> List[Dict[str, str]]:
+    """Load index constituents (e.g. S&P 500, NASDAQ 100) with Yahoo-compatible symbols."""
+    try:
+        import pytickersymbols  # type: ignore
+    except Exception:
+        return []
+
+    pts = pytickersymbols.PyTickerSymbols()
+    try:
+        stocks = list(pts.get_stocks_by_index(index_name) or [])
+    except Exception:
+        return []
+
+    out: List[Dict[str, str]] = []
+    seen: set[str] = set()
+
+    for stock in stocks:
+        name = stock.get("name") or ""
+        yahoo = None
+        for sym in stock.get("symbols") or []:
+            candidate = sym.get("yahoo") or sym.get("symbol")
+            if not candidate:
+                continue
+            # Prefer plain US tickers without exchange suffix for indices
+            if "." not in candidate and "-" not in candidate:
+                yahoo = candidate.upper()
+                break
+        if not yahoo:
+            for sym in stock.get("symbols") or []:
+                candidate = sym.get("yahoo") or sym.get("symbol")
+                if candidate:
+                    yahoo = candidate.upper()
+                    break
+        if not yahoo or yahoo in seen:
+            continue
+        seen.add(yahoo)
+        out.append({
+            "label": f"{name} ({yahoo})",
+            "value": yahoo,
+            "exchange": exchange_id,
+            "type": "company",
+        })
+        if max_count and len(out) >= max_count:
+            break
+
+    return out
+
+
 def find_company(query: str, tickers: Optional[List[Dict[str, str]]] = None) -> Optional[Dict[str, str]]:
     """Exact match by symbol or label."""
     val = (query or "").strip()
@@ -413,6 +465,7 @@ __all__ = [
     "EXCHANGE_LABELS",
     "load_tickers",
     "load_us_tickers",
+    "load_index_constituents",
     "find_company",
     "suggest",
     "looks_like_ticker",

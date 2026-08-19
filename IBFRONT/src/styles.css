@@ -685,6 +685,159 @@ button {
 .screen-breakdown-fill-pass { background: #22c55e; }
 .screen-breakdown-fill-fail { background: #ef4444; }
 
+.screen-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--row-hover);
+  border-radius: 12px;
+}
+.screen-summary-stat { min-width: 90px; }
+.screen-summary-value { display: block; font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.screen-summary-label { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+.grade-dist { margin-top: 16px; }
+.grade-dist-bars {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.grade-dist-item {
+  flex: 1;
+  min-width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.grade-dist-item:hover { background: var(--row-hover); }
+.grade-dist-item.active { border-color: #2563eb; background: var(--row-hover); }
+.grade-dist-label { font-weight: 700; font-size: 0.9rem; }
+.grade-dist-bar-track {
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.grade-dist-bar-fill {
+  width: 60%;
+  min-height: 4px;
+  border-radius: 6px 6px 2px 2px;
+  background: #94a3b8;
+}
+.grade-dist-item.grade-a .grade-dist-bar-fill { background: #22c55e; }
+.grade-dist-item.grade-b .grade-dist-bar-fill { background: #4ade80; }
+.grade-dist-item.grade-c .grade-dist-bar-fill { background: #f59e0b; }
+.grade-dist-item.grade-d .grade-dist-bar-fill { background: #f97316; }
+.grade-dist-item.grade-f .grade-dist-bar-fill { background: #ef4444; }
+.grade-dist-count { font-weight: 700; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.grade-dist-pct { font-size: 0.72rem; color: var(--muted); }
+
+.screen-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.screen-preset-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.screen-preset-chip:hover { background: var(--row-hover); }
+.screen-preset-chip.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.dark-mode .screen-preset-chip.active { background: #1e3a5f; color: #93c5fd; }
+.screen-preset-hint {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.screen-search-label input {
+  min-width: 200px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+}
+
+.screen-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.screen-table-header .section-title { margin: 0; }
+.screen-table-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.screen-table-compact th,
+.screen-table-compact td { padding: 8px 6px; font-size: 0.85rem; }
+
+.pass-dots { display: inline-flex; gap: 3px; align-items: center; }
+.pass-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+.pass-dot.pass { background: #22c55e; }
+
+.screen-star {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--muted);
+  padding: 0;
+  line-height: 1;
+}
+.screen-star.starred { color: #f59e0b; }
+
+.screen-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+.screen-star-btn.starred { border-color: #f59e0b; color: #b45309; }
+
+.screen-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+.screen-pagination-label { font-size: 0.85rem; color: var(--muted); }
+
+.btn-secondary {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* chart */
 .chart-wrap{ position:relative; }
 .chart-line{ color:#94a3b8; }            /* slate-400 baseline color */

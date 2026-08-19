@@ -20,7 +20,35 @@ function fmtPct(value) {
   return `${Number(value).toFixed(1)}%`;
 }
 
-export default function ScreenerTable({ items = [], loading = false, selected, onSelect }) {
+function PassDots({ breakdown = [] }) {
+  const dots = breakdown.length
+    ? breakdown
+    : [{ verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }, { verdict: 'red' }];
+
+  return (
+    <span className="pass-dots" title={`${dots.filter((d) => d.verdict === 'green').length}/${dots.length} metrics pass`}>
+      {dots.map((d, i) => (
+        <span key={i} className={`pass-dot ${d.verdict === 'green' ? 'pass' : 'fail'}`} />
+      ))}
+    </span>
+  );
+}
+
+export default function ScreenerTable({
+  items = [],
+  loading = false,
+  selected,
+  onSelect,
+  shortlist = [],
+  onToggleShortlist,
+  page = 1,
+  pageSize = 50,
+  showPagination = false,
+}) {
+  const pageItems = showPagination
+    ? items.slice((page - 1) * pageSize, page * pageSize)
+    : items;
+
   if (loading && !items.length) {
     return (
       <div className="screen-table-wrap">
@@ -32,42 +60,56 @@ export default function ScreenerTable({ items = [], loading = false, selected, o
   if (!items.length) {
     return (
       <div className="screen-table-wrap">
-        <div className="screen-empty">No stocks match your filters yet. Try refreshing the pipeline.</div>
+        <div className="screen-empty">No stocks match your filters. Try a different preset or clear filters.</div>
       </div>
     );
   }
 
   return (
     <div className="screen-table-wrap">
-      <table className="screen-table">
+      <table className="screen-table screen-table-compact">
         <thead>
           <tr>
+            <th aria-label="Shortlist" />
             <th>#</th>
             <th>Ticker</th>
             <th>Company</th>
-            <th>Score</th>
+            <th>Quality</th>
             <th>Grade</th>
-            <th>Pass</th>
+            <th>Metrics</th>
             <th>Rev CAGR</th>
-            <th>Op Margin</th>
+            <th>Margin</th>
             <th>ROE</th>
             <th />
           </tr>
         </thead>
         <tbody>
-          {items.map((row) => {
+          {pageItems.map((row, idx) => {
             const metrics = row.metrics || {};
             const rev = metrics.revenue_cagr != null ? metrics.revenue_cagr * 100 : null;
             const margin = metrics.operating_margin != null ? metrics.operating_margin * 100 : null;
             const roe = metrics.roe != null ? metrics.roe * 100 : null;
             const active = selected?.ticker === row.ticker;
+            const starred = shortlist.includes(row.ticker);
+            const displayRank = showPagination ? (page - 1) * pageSize + idx + 1 : idx + 1;
+
             return (
               <tr
                 key={row.ticker}
                 className={active ? 'screen-row-active' : ''}
                 onClick={() => onSelect?.(row)}
               >
-                <td>{row.rank}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={`screen-star ${starred ? 'starred' : ''}`}
+                    aria-label={starred ? 'Remove from shortlist' : 'Add to shortlist'}
+                    onClick={(e) => { e.stopPropagation(); onToggleShortlist?.(row.ticker); }}
+                  >
+                    {starred ? '★' : '☆'}
+                  </button>
+                </td>
+                <td>{row.rank ?? displayRank}</td>
                 <td>
                   <button type="button" className="screen-ticker-btn" onClick={(e) => { e.stopPropagation(); onSelect?.(row); }}>
                     {row.ticker}
@@ -75,11 +117,15 @@ export default function ScreenerTable({ items = [], loading = false, selected, o
                 </td>
                 <td>
                   <div className="screen-company">{row.companyName}</div>
-                  <div className="screen-meta">{row.exchangeLabel || row.exchange}{row.sector ? ` · ${row.sector}` : ''}</div>
+                  <div className="screen-meta">{row.sector || row.exchangeLabel || ''}</div>
                 </td>
-                <td><span className={`screen-score screen-score-${scoreTone(row.compositeScore)}`}>{row.compositeScore}</span></td>
+                <td>
+                  <span className={`screen-score screen-score-${scoreTone(row.compositeScore)}`}>
+                    {row.compositeScore}
+                  </span>
+                </td>
                 <td><Badge tone={gradeTone(row.grade)}>{row.grade}</Badge></td>
-                <td>{row.greens}/{row.totalMetrics}</td>
+                <td><PassDots breakdown={row.breakdown} /></td>
                 <td>{fmtPct(rev)}</td>
                 <td>{fmtPct(margin)}</td>
                 <td>{fmtPct(roe)}</td>
@@ -97,11 +143,11 @@ export default function ScreenerTable({ items = [], loading = false, selected, o
   );
 }
 
-export function ScreenerDetail({ row }) {
+export function ScreenerDetail({ row, starred = false, onToggleShortlist }) {
   if (!row) {
     return (
       <div className="screen-detail-empty">
-        Select a stock to see how its composite score was calculated.
+        Select a stock to see how its quality score was calculated.
       </div>
     );
   }
@@ -112,12 +158,21 @@ export function ScreenerDetail({ row }) {
         <div>
           <h3>{row.ticker} · {row.companyName}</h3>
           <p className="screen-detail-sub">
-            Composite score {row.compositeScore}/100 · Grade {row.grade} · {row.passRate}% pass rate
+            Quality score {row.compositeScore}/100 · Grade {row.grade} · {row.greens}/{row.totalMetrics} metrics pass
           </p>
         </div>
-        <Link to={`/analyze?query=${encodeURIComponent(row.ticker)}`} className="btn-range">
-          Full analysis
-        </Link>
+        <div className="screen-detail-actions">
+          <button
+            type="button"
+            className={`btn-secondary screen-star-btn ${starred ? 'starred' : ''}`}
+            onClick={() => onToggleShortlist?.(row.ticker)}
+          >
+            {starred ? '★ Shortlisted' : '☆ Add to shortlist'}
+          </button>
+          <Link to={`/analyze?query=${encodeURIComponent(row.ticker)}`} className="btn-range">
+            Full analysis
+          </Link>
+        </div>
       </div>
       <div className="screen-breakdown">
         {(row.breakdown || []).map((item) => (

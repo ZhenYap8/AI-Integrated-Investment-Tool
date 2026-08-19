@@ -3,12 +3,17 @@ import Card from '../../components/Card.jsx';
 import Badge from '../../components/Badge.jsx';
 import { fetchJSON, api } from '../../lib/api.js';
 import ScreenerTable, { ScreenerDetail } from './ScreenerTable.jsx';
-
-const MIN_SCORE_OPTIONS = [
-  { label: 'All scores', value: '' },
-  { label: '60+ (B or better)', value: '60' },
-  { label: '80+ (A only)', value: '80' },
-];
+import GradeDistribution, { ScreenerSummaryStrip } from './ScreenerSummary.jsx';
+import {
+  PRESETS,
+  computeGradeDistribution,
+  computeSummary,
+  filterItems,
+  getSectors,
+  loadShortlist,
+  saveShortlist,
+  toggleShortlist,
+} from './screenerUtils.js';
 
 const UNIVERSE_OPTIONS = [
   { id: 'sp500', label: 'S&P 500', defaultMax: 500 },
@@ -21,6 +26,9 @@ const SIZE_OPTIONS = [
   { label: '200 stocks', value: '200' },
   { label: '500 stocks', value: '500' },
 ];
+
+const TOP_N = 25;
+const PAGE_SIZE = 50;
 
 function formatUpdated(value) {
   if (!value) return 'Never';
@@ -37,11 +45,17 @@ export default function Screener() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [minScore, setMinScore] = useState('');
-  const [sort, setSort] = useState('score');
   const [universe, setUniverse] = useState('sp500');
   const [maxTickers, setMaxTickers] = useState('500');
   const [selected, setSelected] = useState(null);
+
+  const [showAll, setShowAll] = useState(false);
+  const [gradeFilter, setGradeFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [sector, setSector] = useState('');
+  const [preset, setPreset] = useState('');
+  const [page, setPage] = useState(1);
+  const [shortlist, setShortlist] = useState(() => loadShortlist());
 
   const loadStatus = useCallback(async () => {
     try {
@@ -58,21 +72,15 @@ export default function Screener() {
     setLoading(true);
     setError('');
     try {
-      const params = new URLSearchParams({ sort, limit: '500' });
-      if (minScore) params.set('min_score', minScore);
+      const params = new URLSearchParams({ sort: 'score', limit: '500' });
       const data = await fetchJSON(api(`/api/screen?${params.toString()}`));
       setItems(data.items || []);
-      setSelected((prev) => {
-        if (!data.items?.length) return null;
-        if (prev && data.items.some((row) => row.ticker === prev.ticker)) return prev;
-        return data.items[0];
-      });
     } catch (err) {
       setError(err.message || 'Failed to load screening results');
     } finally {
       setLoading(false);
     }
-  }, [minScore, sort]);
+  }, []);
 
   const pollWhileRunning = useCallback(async () => {
     const data = await loadStatus();
@@ -91,9 +99,7 @@ export default function Screener() {
   }, [loadResults, loadStatus]);
 
   useEffect(() => {
-    if (status?.status === 'running') {
-      pollWhileRunning();
-    }
+    if (status?.status === 'running') pollWhileRunning();
   }, [status?.status, pollWhileRunning]);
 
   useEffect(() => {
@@ -101,6 +107,44 @@ export default function Screener() {
     if (status.universe) setUniverse(status.universe);
     if (status.maxTickers) setMaxTickers(String(status.maxTickers));
   }, [status]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [showAll, gradeFilter, search, sector, preset, items.length]);
+
+  const sectors = useMemo(() => getSectors(items), [items]);
+  const gradeDistribution = useMemo(() => computeGradeDistribution(items), [items]);
+  const universeSummary = useMemo(() => computeSummary(items), [items]);
+
+  const filtered = useMemo(() => {
+    const list = filterItems(items, {
+      search,
+      sector,
+      grade: gradeFilter,
+      preset,
+      shortlist,
+    });
+    list.sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
+    return list;
+  }, [items, search, sector, gradeFilter, preset, shortlist]);
+
+  const displayed = useMemo(() => {
+    if (showAll) return filtered;
+    return filtered.slice(0, TOP_N);
+  }, [filtered, showAll]);
+
+  const totalPages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (!displayed.length) {
+      setSelected(null);
+      return;
+    }
+    setSelected((prev) => {
+      if (prev && displayed.some((r) => r.ticker === prev.ticker)) return prev;
+      return displayed[0];
+    });
+  }, [displayed]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -119,12 +163,24 @@ export default function Screener() {
     }
   };
 
-  const summary = useMemo(() => {
-    if (!items.length) return null;
-    const avg = items.reduce((sum, row) => sum + (row.compositeScore || 0), 0) / items.length;
-    const aCount = items.filter((row) => row.grade === 'A').length;
-    return { avg: avg.toFixed(1), aCount };
-  }, [items]);
+  const onToggleShortlist = (ticker) => {
+    setShortlist((prev) => {
+      const next = toggleShortlist(prev, ticker);
+      saveShortlist(next);
+      return next;
+    });
+  };
+
+  const clearFilters = () => {
+    setGradeFilter('');
+    setSearch('');
+    setSector('');
+    setPreset('');
+    setShowAll(false);
+  };
+
+  const hasActiveFilters = gradeFilter || search || sector || preset || showAll;
+  const activePreset = PRESETS.find((p) => p.id === preset);
 
   return (
     <div className="stack-lg">
@@ -133,12 +189,12 @@ export default function Screener() {
           <div>
             <h1 className="title">Investment Screener</h1>
             <p className="lead">
-              Repeatable fundamentals feed from Yahoo Finance — screen S&amp;P 500, NASDAQ 100, or broader NASDAQ lists with interpretable quality scores.
+              Start with a focused shortlist, then drill into full analysis. Quality scores from Yahoo Finance fundamentals across S&amp;P 500 and NASDAQ indices.
             </p>
           </div>
           <div className="screen-hero-actions">
             <button type="button" className="btn-range" onClick={onRefresh} disabled={refreshing}>
-              {refreshing ? 'Refreshing feed…' : 'Refresh pipeline'}
+              {refreshing ? 'Updating…' : 'Update data'}
             </button>
           </div>
         </div>
@@ -148,19 +204,63 @@ export default function Screener() {
             {status?.status || 'idle'}
           </Badge>
           <span className="screen-status-text">
-            Last updated {formatUpdated(status?.updatedAt)}
+            Updated {formatUpdated(status?.updatedAt)}
             {status?.universeLabel ? ` · ${status.universeLabel}` : ''}
-            {status?.stats?.scored ? ` · ${status.stats.scored} companies scored` : ''}
-            {status?.stale ? ' · cache stale, refresh queued' : ''}
+            {shortlist.length ? ` · ${shortlist.length} shortlisted` : ''}
           </span>
-          {summary && (
-            <span className="screen-status-text">
-              · Avg score {summary.avg} · {summary.aCount} A-grade names
-            </span>
-          )}
+        </div>
+
+        {universeSummary && (
+          <>
+            <ScreenerSummaryStrip
+              summary={universeSummary}
+              universeLabel={status?.universeLabel}
+              filteredCount={filtered.length}
+              showAll={showAll}
+              topN={TOP_N}
+            />
+            <GradeDistribution
+              distribution={gradeDistribution}
+              activeGrade={gradeFilter}
+              onSelect={setGradeFilter}
+            />
+          </>
+        )}
+
+        <div className="screen-preset-row">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id || 'all'}
+              type="button"
+              className={`screen-preset-chip ${preset === p.id ? 'active' : ''}`}
+              title={p.hint}
+              onClick={() => setPreset(preset === p.id ? '' : p.id)}
+            >
+              {p.label}
+              {p.id === 'shortlist' && shortlist.length ? ` (${shortlist.length})` : ''}
+            </button>
+          ))}
         </div>
 
         <div className="screen-filters">
+          <label className="screen-search-label">
+            Search
+            <input
+              type="search"
+              placeholder="Ticker or company…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <label>
+            Sector
+            <select value={sector} onChange={(e) => setSector(e.target.value)}>
+              <option value="">All sectors</option>
+              {sectors.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
           <label>
             Universe
             <select value={universe} onChange={(e) => setUniverse(e.target.value)}>
@@ -177,47 +277,88 @@ export default function Screener() {
               ))}
             </select>
           </label>
-          <label>
-            Min score
-            <select value={minScore} onChange={(e) => setMinScore(e.target.value)}>
-              {MIN_SCORE_OPTIONS.map((opt) => (
-                <option key={opt.label} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Sort by
-            <select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="score">Composite score</option>
-              <option value="ticker">Ticker</option>
-            </select>
-          </label>
         </div>
+
+        {activePreset?.hint && (
+          <p className="screen-preset-hint">{activePreset.hint}</p>
+        )}
 
         {error && <div className="screen-error">{error}</div>}
       </Card>
 
       <div className="screen-layout">
         <Card className="screen-table-card">
-          <h3 className="section-title">Ranked universe ({items.length} shown)</h3>
-          <ScreenerTable items={items} loading={loading || refreshing} selected={selected} onSelect={setSelected} />
+          <div className="screen-table-header">
+            <h3 className="section-title">
+              {showAll
+                ? `${displayed.length} of ${filtered.length} matches`
+                : `Top ${Math.min(TOP_N, filtered.length)} quality leaders`}
+              {!showAll && filtered.length > TOP_N ? ` · ${filtered.length} total match` : ''}
+            </h3>
+            <div className="screen-table-header-actions">
+              {hasActiveFilters && (
+                <button type="button" className="btn-secondary" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              )}
+              {filtered.length > TOP_N && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowAll((v) => !v)}
+                >
+                  {showAll ? `Show top ${TOP_N}` : `Show all (${filtered.length})`}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <ScreenerTable
+            items={displayed}
+            loading={loading || refreshing}
+            selected={selected}
+            onSelect={setSelected}
+            shortlist={shortlist}
+            onToggleShortlist={onToggleShortlist}
+            page={page}
+            pageSize={PAGE_SIZE}
+            showPagination={showAll && displayed.length > PAGE_SIZE}
+          />
+
+          {showAll && displayed.length > PAGE_SIZE && (
+            <div className="screen-pagination">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Previous
+              </button>
+              <span className="screen-pagination-label">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </Card>
+
         <Card className="screen-detail-card">
           <h3 className="section-title">Score breakdown</h3>
-          <ScreenerDetail row={selected} />
+          <ScreenerDetail
+            row={selected}
+            starred={selected ? shortlist.includes(selected.ticker) : false}
+            onToggleShortlist={onToggleShortlist}
+          />
         </Card>
       </div>
-
-      <Card>
-        <h3 className="section-title">How scoring works</h3>
-        <p className="text-sm" style={{ color: 'var(--muted)', marginBottom: 12 }}>
-          Each stock earns up to 100 points across five fundamentals pulled from Yahoo Finance filings:
-          revenue CAGR, operating margin, net debt/equity, interest coverage, and ROE. Full credit is awarded at the default threshold; partial credit applies when a metric is close. Grades: A ≥80, B ≥60, C ≥40, D ≥20.
-        </p>
-        <p className="text-sm" style={{ color: 'var(--muted)' }}>
-          The pipeline refreshes automatically every 12 hours. Choose a universe and max size, then click Refresh pipeline — S&amp;P 500 at 500 stocks takes roughly 1–2 minutes.
-        </p>
-      </Card>
     </div>
   );
 }

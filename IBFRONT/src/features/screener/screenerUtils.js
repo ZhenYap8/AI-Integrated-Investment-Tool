@@ -20,7 +20,10 @@ export function matchesPreset(row, presetId) {
 
   switch (presetId) {
     case 'quality':
-      return score >= 80 && metricPass(row, 'roe') && metricPass(row, 'op_margin');
+      return score >= 80
+        && metricsAvailableCount(row) >= 4
+        && metricPass(row, 'roe')
+        && metricPass(row, 'op_margin');
     case 'growth':
       return score >= 60 && metricPass(row, 'rev_cagr');
     case 'safety':
@@ -71,6 +74,22 @@ export function computeSummary(items) {
   };
 }
 
+export function metricsAvailableCount(row) {
+  if (row?.metricsAvailable != null) return row.metricsAvailable;
+  const breakdown = row?.breakdown || [];
+  if (breakdown.length) {
+    return breakdown.filter((b) => b.verdict !== 'missing').length;
+  }
+  return (row?.scorecard || []).length;
+}
+
+/** Detect old alphabetical NASDAQ samples (AACB, AAPL, ABNB…) vs real indices */
+export function isLikelyAlphabeticalSample(items) {
+  if (!items?.length || items.length >= 200) return false;
+  const startsA = items.filter((r) => (r.ticker || '').startsWith('A')).length;
+  return startsA / items.length > 0.75;
+}
+
 export function filterItems(items, filters) {
   const {
     search = '',
@@ -79,6 +98,7 @@ export function filterItems(items, filters) {
     preset = '',
     shortlist = [],
     shortlistOnly = false,
+    minMetrics = 0,
   } = filters;
 
   const q = search.trim().toLowerCase();
@@ -95,6 +115,7 @@ export function filterItems(items, filters) {
       const hay = `${row.ticker} ${row.companyName} ${row.sector || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
+    if (minMetrics > 0 && metricsAvailableCount(row) < minMetrics) return false;
     return true;
   });
 }

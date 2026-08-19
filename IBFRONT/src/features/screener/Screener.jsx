@@ -10,7 +10,9 @@ import {
   computeSummary,
   filterItems,
   getSectors,
+  isLikelyAlphabeticalSample,
   loadShortlist,
+  metricsAvailableCount,
   saveShortlist,
   toggleShortlist,
 } from './screenerUtils.js';
@@ -35,6 +37,7 @@ function sizeOptionsForUniverse(universeId) {
 
 const TOP_N = 25;
 const PAGE_SIZE = 50;
+const MIN_METRICS_FOR_RANK = 3;
 
 function formatUpdated(value) {
   if (!value) return 'Never';
@@ -150,10 +153,17 @@ export default function Screener() {
       grade: gradeFilter,
       preset,
       shortlist,
+      minMetrics: MIN_METRICS_FOR_RANK,
     });
     list.sort((a, b) => (b.compositeScore || 0) - (a.compositeScore || 0));
     return list;
   }, [items, search, sector, gradeFilter, preset, shortlist]);
+
+  const staleSample = useMemo(() => isLikelyAlphabeticalSample(items), [items]);
+  const hiddenLowData = useMemo(
+    () => items.length - filterItems(items, { search, sector, grade: gradeFilter, preset, shortlist, minMetrics: MIN_METRICS_FOR_RANK }).length,
+    [items, search, sector, gradeFilter, preset, shortlist],
+  );
 
   const displayed = useMemo(() => {
     if (showAll) return filtered;
@@ -328,6 +338,13 @@ export default function Screener() {
         )}
 
         {error && <div className="screen-error">{error}</div>}
+
+        {staleSample && (
+          <div className="screen-warning">
+            This looks like an old alphabetical NASDAQ sample (mostly tickers starting with &quot;A&quot;).
+            Select <strong>S&amp;P 500</strong>, set max stocks to <strong>500</strong>, then click <strong>Apply settings</strong>.
+          </div>
+        )}
       </Card>
 
       <div className="screen-layout">
@@ -337,7 +354,8 @@ export default function Screener() {
               {showAll
                 ? `${displayed.length} of ${filtered.length} matches`
                 : `Top ${Math.min(TOP_N, filtered.length)} quality leaders`}
-              {!showAll && filtered.length > TOP_N ? ` · ${filtered.length} total match` : ''}
+              {!showAll && filtered.length > TOP_N ? ` · ${filtered.length} rankable` : ''}
+              {hiddenLowData > 0 ? ` · ${hiddenLowData} hidden (insufficient data)` : ''}
             </h3>
             <div className="screen-table-header-actions">
               {hasActiveFilters && (

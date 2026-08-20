@@ -1,28 +1,27 @@
 // src/features/analyzer/Analyzer.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, fetchJSON } from "../../lib/api.js";
 
-// importing necessary components
 import Card from "../../components/Card.jsx";
-import SearchBar from "../../components/SearchBar.jsx";
-import NumField from "../../components/NumField.jsx";
 import SkeletonCard from "../../components/SkeletonCard.jsx";
 import EmptyState from "../../components/EmptyState.jsx";
-// cleaning the search system
-import useFuzzySearch, { fuzzyFilter } from "../FuzzySearchFixing";
-// calling analyzer results for the AI analysis display
+import { fuzzyFilter } from "../FuzzySearchFixing";
 import AnalyzerResults from "./AnalyzerResults";
 import PreAnalyzer from "./PreAnalyzer";
+import {
+  loadAnalyzerSession,
+  saveAnalyzerSession,
+  sessionMatches,
+} from "./analyzerSession.js";
 
 const HISTORY_PRESETS = ["6m", "1y", "3y", "5y", "10y", "max"];
-
-// default thresholds shared by the UI
 const DEFAULT_THRESH = { rev_cagr_min: 5, op_margin_min: 10, nd_eq_max: 1.0, interest_cover_min: 4.0, roe_min: 10 };
 
-function periodLabel(p) {
-  if (p === "max") return "All";
-  return (p || "").toUpperCase();
+function readInitialSession() {
+  return loadAnalyzerSession() || {};
 }
+
 function yearsFromPeriod(p) {
   if (!p) return 5;
   const v = String(p).toLowerCase();
@@ -30,6 +29,7 @@ function yearsFromPeriod(p) {
   if (v.endsWith("y") && !Number.isNaN(parseInt(v))) return parseInt(v);
   return 5;
 }
+
 function historyLabel(p) {
   const v = String(p || "5y").toLowerCase();
   if (v === "max") return "All available";
@@ -38,49 +38,91 @@ function historyLabel(p) {
   return v.toUpperCase();
 }
 
+function initialPeriod(searchParams) {
+  const fromUrl = (searchParams.get('period') || searchParams.get('range') || '').toLowerCase();
+  if (HISTORY_PRESETS.includes(fromUrl)) return fromUrl;
+  const saved = readInitialSession();
+  if (saved.period && HISTORY_PRESETS.includes(saved.period)) return saved.period;
+  try {
+    const stored = localStorage.getItem('agent-period');
+    if (stored && HISTORY_PRESETS.includes(stored)) return stored;
+  } catch {}
+  return '5y';
+}
+
 export default function Analyzer() {
-  const [query, setQuery] = useState("");
-  const [period, setPeriod] = useState('5y');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const boot = useMemo(() => readInitialSession(), []);
+
+  const [query, setQuery] = useState(() => boot.query || searchParams.get('query') || '');
+  const [period, setPeriod] = useState(() => initialPeriod(searchParams));
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [resp, setResp] = useState(null);
-  const [findings, setFindings] = useState(null);
-  const [headlines, setHeadlines] = useState([]);
-  const [insightMode, setInsightMode] = useState("");
+  const [error, setError] = useState('');
+  const [resp, setResp] = useState(() => boot.resp || null);
+  const [findings, setFindings] = useState(() => boot.findings || null);
+  const [headlines, setHeadlines] = useState(() => boot.headlines || []);
+  const [insightMode, setInsightMode] = useState(() => boot.insightMode || '');
   const [aiLoading, setAiLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggest, setShowSuggest] = useState(false);
-  const [allTickers, setAllTickers] = useState(null); // full list (optional client-side fuzzy)
-  const [thresh, setThresh] = useState(DEFAULT_THRESH);
+  const [allTickers, setAllTickers] = useState(null);
+  const [thresh, setThresh] = useState(() => boot.thresh || DEFAULT_THRESH);
 
-  // Initialize period from URL (?period= or ?range=) or localStorage
+  const lastAutoQuery = useRef(
+    boot.resp && boot.query ? boot.query : '',
+  );
+  const analyzeRequestId = useRef(0);
+  const hydrated = useRef(false);
+
+  const urlQuery = searchParams.get('query') || '';
+
+  // Restore URL from session when returning without ?query=
   useEffect(() => {
-    try {
-      const usp = new URLSearchParams(window.location.search);
-      const p = (usp.get('period') || usp.get('range') || '').toLowerCase();
-      if (HISTORY_PRESETS.includes(p)) {
-        setPeriod(p);
-        return;
-      }
-      const saved = localStorage.getItem('agent-period');
-      if (saved && HISTORY_PRESETS.includes(saved)) setPeriod(saved);
-    } catch {}
+    if (hydrated.current) return;
+    hydrated.current = true;
+    if (!urlQuery && boot.query && boot.resp) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('query', boot.query);
+        if (boot.period) next.set('period', boot.period);
+        const yMap = yearsFromPeriod(boot.period || period);
+        if (yMap) next.set('years', String(yMap));
+        return next;
+      }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist period to URL and localStorage
   useEffect(() => {
     try {
       localStorage.setItem('agent-period', period);
-      const usp = new URLSearchParams(window.location.search);
-      usp.set('period', period);
-      const yMap = yearsFromPeriod(period);
-      if (yMap) usp.set('years', String(yMap)); else usp.delete('years');
-      const newUrl = `${window.location.pathname}?${usp.toString()}${window.location.hash}`;
-      window.history.replaceState({}, '', newUrl);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('period', period);
+        const yMap = yearsFromPeriod(period);
+        if (yMap) next.set('years', String(yMap));
+        else next.delete('years');
+        if (next.toString() === prev.toString()) return prev;
+        return next;
+      }, { replace: true });
     } catch {}
-  }, [period]);
+  }, [period, setSearchParams]);
 
-  // Load full ticker list once (optional): used for client-side fuzzy filtering if available
+  // Save session whenever analysis state changes
+  useEffect(() => {
+    if (!resp && !query.trim()) return;
+    saveAnalyzerSession({
+      query,
+      period,
+      resp,
+      findings,
+      headlines,
+      insightMode,
+      thresh,
+    });
+  }, [query, period, resp, findings, headlines, insightMode, thresh]);
+
   useEffect(() => {
     let stop = false;
     (async () => {
@@ -94,7 +136,6 @@ export default function Analyzer() {
     return () => { stop = true; };
   }, []);
 
-  // Fetch suggestions as user types (debounced). If we have the full ticker list, use client-side fuzzyFilter; otherwise fallback to server suggest.
   useEffect(() => {
     let stopped = false;
     const q = query.trim();
@@ -102,19 +143,16 @@ export default function Analyzer() {
 
     const handler = setTimeout(async () => {
       if (stopped) return;
-      // client-side fuzzy if we have the full list
       if (Array.isArray(allTickers) && allTickers.length > 0) {
         try {
           const items = fuzzyFilter(allTickers, q, { limit: 50 });
           if (!stopped) setSuggestions(items || []);
           return;
-        } catch (e) {
+        } catch {
           if (!stopped) setSuggestions([]);
           return;
         }
       }
-
-      // fallback to server suggest
       try {
         const items = await fetchJSON(api(`/api/suggest?q=${encodeURIComponent(q)}`));
         if (!stopped) setSuggestions(items || []);
@@ -126,20 +164,31 @@ export default function Analyzer() {
     return () => { stopped = true; clearTimeout(handler); };
   }, [query, allTickers]);
 
-
-  // RUN ANALYSIS //
-
   const runAnalyze = async (qVal, periodOverride) => {
     const val = (qVal ?? query).trim();
     if (!val) return;
     const activePeriod = periodOverride ?? period;
-    setLoading(true); setError(""); setResp(null); setFindings(null); setHeadlines([]); setInsightMode(""); setAiLoading(false); setShowSuggest(false);
+    const requestId = ++analyzeRequestId.current;
+    setQuery(val);
+    lastAutoQuery.current = val;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('query', val);
+      return next;
+    }, { replace: true });
+    setLoading(true);
+    setError('');
+    setResp(null);
+    setFindings(null);
+    setHeadlines([]);
+    setInsightMode('');
+    setAiLoading(false);
+    setShowSuggest(false);
     try {
       const params = new URLSearchParams({ query: val });
       if (activePeriod) params.set('period', activePeriod);
       const yMap = yearsFromPeriod(activePeriod);
       if (yMap) params.set('years', String(yMap));
-      // Only send overrides if present
       const toNum = (x) => (x === "" || x === null || x === undefined ? undefined : Number(x));
       const o = {
         rev_cagr_min: toNum(thresh.rev_cagr_min) / 100,
@@ -148,15 +197,12 @@ export default function Analyzer() {
         interest_cover_min: toNum(thresh.interest_cover_min),
         roe_min: toNum(thresh.roe_min) / 100,
       };
-      Object.entries(o).forEach(([k,v]) => { if (v !== undefined && !Number.isNaN(v)) params.set(k, String(v)); });
-      // Debug: log request params so we can inspect the exact API call
-      try { console.debug('[runAnalyze] request ->', `/api/analyze?${params.toString()}`); } catch(e){}
+      Object.entries(o).forEach(([k, v]) => { if (v !== undefined && !Number.isNaN(v)) params.set(k, String(v)); });
       const data = await fetchJSON(api(`/api/analyze?${params.toString()}`));
-      // Debug: log raw response for troubleshooting
-      try { console.debug('[runAnalyze] response ->', data); } catch(e){}
+      if (requestId !== analyzeRequestId.current) return;
+
       setResp(data || null);
 
-      // Pros/Cons findings (ticker-only). Non-blocking.
       if (data?.meta?.queryType === 'company' && data?.meta?.ticker) {
         setAiLoading(true);
         try {
@@ -164,27 +210,28 @@ export default function Analyzer() {
           const f = await fetchJSON(api('/api/proscons/analyze'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ticker: data.meta.ticker, max: 8, period: activePeriod, years: yrs })
+            body: JSON.stringify({ ticker: data.meta.ticker, max: 8, period: activePeriod, years: yrs }),
           });
+          if (requestId !== analyzeRequestId.current) return;
           setFindings(f?.findings || []);
           setHeadlines(f?.headlines || []);
-          setInsightMode(f?.mode || "");
+          setInsightMode(f?.mode || '');
         } catch {} finally {
-          setAiLoading(false);
+          if (requestId === analyzeRequestId.current) setAiLoading(false);
         }
       }
     } catch (e) {
-      // Log error to console to help track frontend failures
-      try { console.error('[runAnalyze] error', e); } catch (ee) {}
+      if (requestId !== analyzeRequestId.current) return;
       setError(typeof e?.message === 'string' ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (requestId === analyzeRequestId.current) setLoading(false);
     }
   };
 
   const onPeriodChange = (p) => {
     setPeriod(p);
-    if (query.trim()) runAnalyze(query.trim(), p);
+    const q = query.trim() || resp?.meta?.ticker || urlQuery.trim();
+    if (q) runAnalyze(q, p);
   };
 
   const onPickSuggestion = (s) => {
@@ -193,14 +240,39 @@ export default function Analyzer() {
     runAnalyze(val);
   };
 
+  // Auto-run only for new ?query= links — not when restoring a saved session
+  useEffect(() => {
+    const q = urlQuery.trim();
+    if (!q) return;
+
+    const cached = loadAnalyzerSession();
+    if (sessionMatches(cached, q, period)) {
+      lastAutoQuery.current = q;
+      if (!resp) {
+        setQuery(cached.query || q);
+        setResp(cached.resp);
+        setFindings(cached.findings || null);
+        setHeadlines(cached.headlines || []);
+        setInsightMode(cached.insightMode || '');
+        if (cached.thresh) setThresh(cached.thresh);
+        if (cached.period) setPeriod(cached.period);
+      }
+      return;
+    }
+
+    if (q === lastAutoQuery.current) return;
+    lastAutoQuery.current = q;
+    setQuery(q);
+    runAnalyze(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlQuery]);
+
   const series = useMemo(() => {
     if (!resp?.prices) return [];
     return resp.prices
       .map(p => ({ t: new Date(p.date || p._ts || Date.now()), y: typeof p.y === 'number' ? p.y : (typeof p.roe === 'number' ? p.roe : null) }))
       .filter(p => p.y !== null);
   }, [resp]);
-
-  const valuationRows = resp?.valuation?.table || [];
 
   return (
     <div className="stack-lg">
@@ -235,9 +307,14 @@ export default function Analyzer() {
         </>
       )}
 
-      {!loading && !resp && <EmptyState title="No analysis yet" text="Search for a ticker (e.g., NVDA, BP.L, SHOP.TO) or an industry (e.g., Robotics) and hit Run." />}
+      {!loading && !resp && (
+        <EmptyState
+          title="No analysis yet"
+          text="Search for a ticker (e.g., NVDA, BP.L, SHOP.TO) or an industry (e.g., Robotics) and hit Run."
+        />
+      )}
 
-      {resp && (
+      {resp && !loading && (
         <AnalyzerResults
           resp={resp}
           series={series}

@@ -47,6 +47,58 @@ def get_row(df: Optional['pd.DataFrame'], name: str) -> Optional['pd.Series']:
     return series[::-1] if hasattr(series, "__getitem__") else None
 
 
+NET_INCOME_NAMES = (
+    'Net Income',
+    'NetIncome',
+    'NetIncomeCommonStockholders',
+    'Net Income Common Stockholders',
+)
+EQUITY_NAMES = (
+    'Total Stockholder Equity',
+    'Stockholders Equity',
+    'StockholdersEquity',
+    'Total Equity Gross Minority Interest',
+    'TotalEquityGrossMinorityInterest',
+    'Common Stock Equity',
+    'CommonStockEquity',
+)
+
+
+def get_row_first(df: Optional['pd.DataFrame'], names: tuple) -> Optional['pd.Series']:
+    """Return first matching statement row with usable data, oldest→newest."""
+    if df is None or not hasattr(df, 'index'):
+        return None
+    for name in names:
+        if name not in df.index:
+            continue
+        series: 'pd.Series' = df.loc[name].dropna()
+        if len(series) < 1:
+            continue
+        try:
+            series = series.sort_index()
+        except Exception:
+            pass
+        return series
+    return None
+
+
+def _fundamentals_frames(ticker_obj, *, quarterly: bool):
+    """Load income + balance sheet via yfinance fundamentals API when available."""
+    freq = 'quarterly' if quarterly else 'yearly'
+    try:
+        fundamentals = getattr(ticker_obj, '_fundamentals', None)
+        fin = getattr(fundamentals, 'financials', None) if fundamentals else None
+        if fin is None:
+            return None, None
+        inc = fin.get_income_time_series(freq=freq)
+        bs = fin.get_balance_sheet_time_series(freq=freq)
+        if inc is None or bs is None or getattr(inc, 'empty', True) or getattr(bs, 'empty', True):
+            return None, None
+        return inc, bs
+    except Exception:
+        return None, None
+
+
 def add_series(a: Optional['pd.Series'], b: Optional['pd.Series']) -> Optional['pd.Series']:
     if a is None and b is None:
         return None
@@ -168,30 +220,32 @@ def build_historical_roe_for_ticker(
     from services.analysis.base import BaseAnalyzer
 
     use_quarterly = BaseAnalyzer.uses_quarterly_roe(period, years)
-    months = BaseAnalyzer.resolve_lookback_months(period, years)
+    chart_years = BaseAnalyzer.resolve_chart_years(period, years)
+    chart_months = BaseAnalyzer.resolve_lookback_months(period, years)
 
-    if use_quarterly:
-        fin = getattr(ticker_obj, 'quarterly_financials', None)
-        if fin is None or (hasattr(fin, 'empty') and fin.empty):
-            fin = getattr(ticker_obj, 'quarterly_income_stmt', None)
-        bs = getattr(ticker_obj, 'quarterly_balance_sheet', None)
-        granularity = "quarterly"
-    else:
-        fin = getattr(ticker_obj, 'financials', None)
-        if fin is None or (hasattr(fin, 'empty') and fin.empty):
-            fin = getattr(ticker_obj, 'income_stmt', None)
-        bs = getattr(ticker_obj, 'balance_sheet', None)
-        granularity = "annual"
+    inc, bs = _fundamentals_frames(ticker_obj, quarterly=use_quarterly)
+    if inc is None or bs is None:
+        if use_quarterly:
+            inc = getattr(ticker_obj, 'quarterly_income_stmt', None) or getattr(ticker_obj, 'quarterly_financials', None)
+            bs = getattr(ticker_obj, 'quarterly_balance_sheet', None)
+        else:
+            inc = getattr(ticker_obj, 'income_stmt', None) or getattr(ticker_obj, 'financials', None)
+            bs = getattr(ticker_obj, 'balance_sheet', None)
 
-    net_income = get_row(fin, 'Net Income')
-    equity_row = get_row(bs, 'Total Stockholder Equity')
-    equity_alt = get_row(bs, 'Total Equity Gross Minority Interest')
-    equity = coalesce(equity_row, equity_alt) if coalesce else (equity_row or equity_alt)
+    net_income = get_row_first(inc, NET_INCOME_NAMES)
+    equity = get_row_first(bs, EQUITY_NAMES)
+    if equity is None and coalesce:
+        equity = coalesce(
+            get_row(bs, 'Total Stockholder Equity'),
+            get_row(bs, 'Stockholders Equity'),
+            get_row(bs, 'Total Equity Gross Minority Interest'),
+        )
 
+    granularity = "quarterly" if use_quarterly else "annual"
     series = build_historical_roe(
         net_income,
         equity,
-        years=years if not use_quarterly else None,
-        months=months if use_quarterly else None,
+        years=chart_years if not use_quarterly else None,
+        months=chart_months if use_quarterly else None,
     )
     return series, granularity

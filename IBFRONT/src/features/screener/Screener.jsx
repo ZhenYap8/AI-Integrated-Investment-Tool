@@ -251,6 +251,7 @@ export default function Screener() {
       <Card>
         <div className="screen-hero">
           <div>
+            <span className="eyebrow">Quality screening</span>
             <h1 className="title">Investment Screener</h1>
             <p className="lead">
               Compare companies within the same sector — not across the whole market. Pick a sector, review the top names, then drill into full analysis.
@@ -258,11 +259,11 @@ export default function Screener() {
           </div>
           <div className="screen-hero-actions">
             {settingsDirty && (
-              <button type="button" className="btn-range" onClick={onApplySettings} disabled={refreshing}>
+              <button type="button" className="btn-range btn-primary" onClick={onApplySettings} disabled={refreshing}>
                 {refreshing ? 'Applying…' : 'Apply settings'}
               </button>
             )}
-            <button type="button" className="btn-secondary" onClick={onRefresh} disabled={refreshing}>
+            <button type="button" className="btn-range btn-secondary" onClick={onRefresh} disabled={refreshing}>
               {refreshing ? 'Updating…' : 'Update data'}
             </button>
           </div>
@@ -402,14 +403,14 @@ export default function Screener() {
             </h3>
             <div className="screen-table-header-actions">
               {hasActiveFilters && (
-                <button type="button" className="btn-secondary" onClick={clearFilters}>
+                <button type="button" className="btn-range btn-secondary" onClick={clearFilters}>
                   Clear filters
                 </button>
               )}
               {!isShortlistView && filtered.length > TOP_N && (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-range btn-secondary"
                   onClick={() => setShowAll((v) => !v)}
                 >
                   {showAll ? `Show top ${TOP_N}` : `Show all in sector (${filtered.length})`}
@@ -438,7 +439,7 @@ export default function Screener() {
             <div className="screen-pagination">
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-range btn-secondary"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => p - 1)}
               >
@@ -449,7 +450,7 @@ export default function Screener() {
               </span>
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-range btn-secondary"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >

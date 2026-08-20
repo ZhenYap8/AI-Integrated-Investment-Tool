@@ -8,7 +8,7 @@ export default function NotFound() {
     <EmptyState
       title="Page not found"
       text="The page you are looking for does not exist."
-      action={<Link to="/" className="btn-range">Go home</Link>}
+      action={<Link to="/" className="btn-range btn-primary">Go home</Link>}
     />
   );
 }

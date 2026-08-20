@@ -184,7 +184,7 @@ export function ScreenerDetail({ row, starred = false, onToggleShortlist }) {
         <div className="screen-detail-actions">
           <button
             type="button"
-            className={`btn-secondary screen-star-btn ${starred ? 'starred' : ''}`}
+            className={`btn-range btn-secondary screen-star-btn ${starred ? 'starred' : ''}`}
             onClick={() => onToggleShortlist?.(row.ticker)}
           >
             {starred ? '★ Shortlisted' : '☆ Add to shortlist'}

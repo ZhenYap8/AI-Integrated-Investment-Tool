@@ -25,19 +25,42 @@ class BaseAnalyzer:
 
     @staticmethod
     def uses_quarterly_roe(period: Optional[str], years: Optional[int] = None) -> bool:
-        """Short windows use quarterly filings for a meaningful ROE chart."""
+        """Quarterly ROE for short windows only; longer presets use annual filings."""
         p = BaseAnalyzer.normalize_period(period)
-        if p in ("6mo", "1y"):
-            return True
-        return years is not None and years <= 1
+        return p in ("6mo", "1y")
+
+    @staticmethod
+    def resolve_chart_years(period: Optional[str], years: Optional[int] = None) -> Optional[int]:
+        """Fiscal-year span for annual ROE chart filtering."""
+        p = BaseAnalyzer.normalize_period(period)
+        if p == "max":
+            return None
+        if years is not None:
+            return years
+        if p and p.endswith("y") and p[:-1].isdigit():
+            return int(p[:-1])
+        return 5
 
     @staticmethod
     def resolve_lookback_months(period: Optional[str], years: Optional[int] = None) -> Optional[int]:
+        """Map UI period preset to months of ROE history for chart filtering."""
         p = BaseAnalyzer.normalize_period(period)
         if p == "6mo":
             return 6
-        if p == "1y" or years == 1:
+        if p == "1y":
             return 12
+        if p == "2y":
+            return 24
+        if p == "3y":
+            return 36
+        if p == "5y":
+            return 60
+        if p == "10y":
+            return 120
+        if p == "max":
+            return None
+        if years is not None:
+            return years * 12
         return None
 
     @staticmethod

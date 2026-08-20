@@ -122,7 +122,17 @@ export default function AnalyzerResults({
 
         <Card>
           <h3 className="section-title">{roeChartLabel}</h3>
-          <PriceChart series={series} height={280} label="ROE" />
+          {series.length > 0 && series.length < 4 && meta.roeGranularity === 'annual' && (
+            <p className="sub" style={{ marginBottom: 8 }}>
+              Yahoo Finance provides limited annual history (~3–4 fiscal years).
+            </p>
+          )}
+          <PriceChart
+            key={`${period}-${series.length}-${series[0]?.t?.getTime() ?? 0}-${series.at(-1)?.t?.getTime() ?? 0}`}
+            series={series}
+            height={280}
+            label="ROE"
+          />
         </Card>
       </div>
 

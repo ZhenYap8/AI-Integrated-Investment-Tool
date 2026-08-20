@@ -41,7 +41,7 @@ export default function PreAnalyzer({
                 disabled={loading}
               >{periodLabel(p)}</button>
             ))}
-            <button className="btn-range" onClick={() => runAnalyze()} disabled={loading || !query}>Run</button>
+            <button className="btn-range btn-primary" onClick={() => runAnalyze()} disabled={loading || !query}>Run analysis</button>
           </div>
         </div>
       </Card>
